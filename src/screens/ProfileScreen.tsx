@@ -1,0 +1,270 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Avatar } from '../components/Avatar';
+import { ProfileMenuItem } from '../components/ProfileMenuItem';
+import { colors, radii } from '../theme';
+
+const menuItems = [
+  { label: 'My Goals', icon: 'flag-outline' as const, value: '2 active' },
+  { label: 'History', icon: 'time-outline' as const, value: '48 proofs' },
+  { label: 'Friends', icon: 'people-outline' as const, value: '24' },
+  { label: 'Settings', icon: 'settings-outline' as const },
+];
+
+const week = [
+  { day: 'M', done: true },
+  { day: 'T', done: true },
+  { day: 'W', done: true },
+  { day: 'T', done: false },
+  { day: 'F', done: false },
+  { day: 'S', done: false },
+  { day: 'S', done: false },
+];
+
+export function ProfileScreen() {
+  return (
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Text style={styles.title}>Your proof.</Text>
+          <Pressable accessibilityLabel="Edit profile" style={styles.editButton}>
+            <Ionicons color={colors.ink} name="create-outline" size={20} />
+          </Pressable>
+        </View>
+
+        <View style={styles.identity}>
+          <Avatar initials="DP" size={82} />
+          <View style={styles.identityCopy}>
+            <Text style={styles.name}>DailyProof User</Text>
+            <Text style={styles.handle}>@yourname</Text>
+            <Text style={styles.bio}>Doing the small things I said I would.</Text>
+          </View>
+        </View>
+
+        <View style={styles.stats}>
+          <View style={styles.stat}>
+            <Text style={styles.statValue}>48</Text>
+            <Text style={styles.statLabel}>PROOFS</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.stat}>
+            <Text style={styles.statValue}>7</Text>
+            <Text style={styles.statLabel}>DAY STREAK</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.stat}>
+            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statLabel}>FRIENDS</Text>
+          </View>
+        </View>
+
+        <View style={styles.weekCard}>
+          <View style={styles.weekHeader}>
+            <View>
+              <Text style={styles.cardEyebrow}>THIS WEEK</Text>
+              <Text style={styles.weekTitle}>3 promises kept</Text>
+            </View>
+            <View style={styles.percentBadge}>
+              <Text style={styles.percentText}>43%</Text>
+            </View>
+          </View>
+          <View style={styles.days}>
+            {week.map((item, index) => (
+              <View key={`${item.day}-${index}`} style={styles.day}>
+                <View style={[styles.dayDot, item.done && styles.dayDotDone]}>
+                  {item.done ? (
+                    <Ionicons color={colors.ink} name="checkmark" size={16} />
+                  ) : null}
+                </View>
+                <Text style={styles.dayLabel}>{item.day}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <Text style={styles.menuTitle}>ACCOUNT</Text>
+        <View style={styles.menu}>
+          {menuItems.map((item, index) => (
+            <ProfileMenuItem
+              icon={item.icon}
+              isLast={index === menuItems.length - 1}
+              key={item.label}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  content: {
+    paddingBottom: 34,
+    paddingHorizontal: 18,
+  },
+  topBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+  },
+  title: {
+    color: colors.ink,
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -1.2,
+  },
+  editButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 21,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  identity: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: 30,
+  },
+  identityCopy: {
+    flex: 1,
+    marginLeft: 17,
+  },
+  name: {
+    color: colors.ink,
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  handle: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: 3,
+  },
+  bio: {
+    color: colors.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 9,
+  },
+  stats: {
+    alignItems: 'center',
+    backgroundColor: colors.ink,
+    borderRadius: radii.large,
+    flexDirection: 'row',
+    marginTop: 26,
+    paddingVertical: 20,
+  },
+  stat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    color: colors.surface,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  statLabel: {
+    color: '#8E918A',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginTop: 5,
+  },
+  divider: {
+    backgroundColor: '#3A3D38',
+    height: 30,
+    width: 1,
+  },
+  weekCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.large,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 18,
+  },
+  weekHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cardEyebrow: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  weekTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    marginTop: 5,
+  },
+  percentBadge: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  percentText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  days: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  day: {
+    alignItems: 'center',
+    gap: 7,
+  },
+  dayDot: {
+    alignItems: 'center',
+    borderColor: colors.line,
+    borderRadius: 17,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  dayDotDone: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  dayLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  menuTitle: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 9,
+    marginLeft: 4,
+    marginTop: 26,
+  },
+  menu: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.large,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+});
