@@ -3,11 +3,17 @@ import {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 
 import { mockGoals } from '../services/mockGoals';
+import {
+  readStoredJson,
+  storageKeys,
+  writeStoredJson,
+} from '../services/storage';
 import { Goal, NewGoal } from '../types/goal';
 
 const MAX_ACTIVE_GOALS = 3;
@@ -29,6 +35,36 @@ type GoalProviderProps = {
 
 export function GoalProvider({ children }: GoalProviderProps) {
   const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function restoreGoals() {
+      const storedGoals = await readStoredJson<Goal[]>(
+        storageKeys.goals,
+        mockGoals,
+      );
+
+      if (isMounted) {
+        setGoals(Array.isArray(storedGoals) ? storedGoals : mockGoals);
+        setIsHydrated(true);
+      }
+    }
+
+    void restoreGoals();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated) {
+      void writeStoredJson(storageKeys.goals, goals);
+    }
+  }, [goals, isHydrated]);
+
   const activeGoals = useMemo(
     () => goals.filter((goal) => goal.isActive),
     [goals],
@@ -89,6 +125,10 @@ export function GoalProvider({ children }: GoalProviderProps) {
       incrementGoalCompletedDays,
     ],
   );
+
+  if (!isHydrated) {
+    return null;
+  }
 
   return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;
 }

@@ -3,11 +3,17 @@ import {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 
 import { useGoals } from './GoalContext';
+import {
+  readStoredJson,
+  storageKeys,
+  writeStoredJson,
+} from '../services/storage';
 import { CheckIn } from '../types/checkIn';
 import { FeedPost } from '../types/feed';
 import { Goal } from '../types/goal';
@@ -27,6 +33,16 @@ const CheckInContext = createContext<CheckInContextValue | undefined>(
 
 type CheckInProviderProps = {
   children: ReactNode;
+};
+
+type StoredCheckInState = {
+  checkIns: CheckIn[];
+  checkInFeedPosts: FeedPost[];
+};
+
+const emptyCheckInState: StoredCheckInState = {
+  checkIns: [],
+  checkInFeedPosts: [],
 };
 
 function isSameCalendarDay(firstDate: string, secondDate: string) {
@@ -56,6 +72,46 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
   const { incrementGoalCompletedDays } = useGoals();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [checkInFeedPosts, setCheckInFeedPosts] = useState<FeedPost[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function restoreCheckInState() {
+      const storedState = await readStoredJson<StoredCheckInState>(
+        storageKeys.checkInState,
+        emptyCheckInState,
+      );
+
+      if (isMounted) {
+        setCheckIns(
+          Array.isArray(storedState?.checkIns) ? storedState.checkIns : [],
+        );
+        setCheckInFeedPosts(
+          Array.isArray(storedState?.checkInFeedPosts)
+            ? storedState.checkInFeedPosts
+            : [],
+        );
+        setIsHydrated(true);
+      }
+    }
+
+    void restoreCheckInState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated) {
+      void writeStoredJson<StoredCheckInState>(storageKeys.checkInState, {
+        checkIns,
+        checkInFeedPosts,
+      });
+    }
+  }, [checkIns, checkInFeedPosts, isHydrated]);
+
 
   const hasCheckedInToday = useCallback(
     (goalId: string) => {
@@ -105,6 +161,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
         categoryEmoji: goal.categoryEmoji,
         photoUrl,
         isCheckIn: true,
+        createdAt,
       };
 
       setCheckIns((currentCheckIns) => [checkIn, ...currentCheckIns]);
@@ -128,6 +185,10 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
     }),
     [checkIns, checkInFeedPosts, hasCheckedInToday, submitCheckIn],
   );
+
+  if (!isHydrated) {
+    return null;
+  }
 
   return (
     <CheckInContext.Provider value={value}>

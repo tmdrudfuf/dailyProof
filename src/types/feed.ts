@@ -11,4 +11,5 @@ export type FeedPost = {
   categoryEmoji?: string;
   photoUrl?: string;
   isCheckIn?: boolean;
+  createdAt?: string;
 };

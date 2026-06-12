@@ -9,10 +9,30 @@ import { useGoals } from '../context/GoalContext';
 import { mockFeedPosts } from '../services/mockFeed';
 import { colors, radii } from '../theme';
 
+function getCheckInTime(createdAt?: string) {
+  if (!createdAt) {
+    return 'Just now';
+  }
+
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) {
+    return 'Just now';
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function FeedScreen() {
   const { checkInFeedPosts, hasCheckedInToday } = useCheckIns();
   const { activeGoals } = useGoals();
-  const feedPosts = [...checkInFeedPosts, ...mockFeedPosts];
+  const restoredCheckInPosts = checkInFeedPosts.map((post) => ({
+    ...post,
+    timeAgo: getCheckInTime(post.createdAt),
+  }));
+  const feedPosts = [...restoredCheckInPosts, ...mockFeedPosts];
   const provedGoalCount = activeGoals.filter((goal) =>
     hasCheckedInToday(goal.id),
   ).length;

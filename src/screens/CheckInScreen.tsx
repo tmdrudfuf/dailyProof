@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useCheckIns } from '../context/CheckInContext';
 import { useGoals } from '../context/GoalContext';
+import { persistCheckInPhoto } from '../services/photoStorage';
 import { colors, radii } from '../theme';
 import { CameraStackParamList } from '../types/navigation';
 
@@ -69,13 +70,14 @@ export function CheckInScreen({
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!photoUri || isSubmitting || !goal) {
       return;
     }
 
     setIsSubmitting(true);
-    const checkIn = submitCheckIn(goal, photoUri);
+    const storedPhotoUri = await persistCheckInPhoto(photoUri);
+    const checkIn = submitCheckIn(goal, storedPhotoUri);
     navigation.replace('CheckInResult', { checkInId: checkIn.id });
   }
 
