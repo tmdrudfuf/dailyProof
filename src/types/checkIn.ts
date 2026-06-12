@@ -1,4 +1,4 @@
-export type CheckInResult = 'approved';
+export type CheckInResult = 'approved' | 'warning' | 'rejected';
 
 export type CheckIn = {
   id: string;
@@ -7,5 +7,6 @@ export type CheckIn = {
   photoUrl: string;
   aiConfidence: number;
   aiResult: CheckInResult;
+  aiFeedback: string;
   createdAt: string;
 };

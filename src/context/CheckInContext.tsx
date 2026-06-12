@@ -14,6 +14,7 @@ import {
   storageKeys,
   writeStoredJson,
 } from '../services/storage';
+import { verifyCheckInPhoto } from '../services/verificationService';
 import { CheckIn } from '../types/checkIn';
 import { FeedPost } from '../types/feed';
 import { Goal } from '../types/goal';
@@ -24,7 +25,7 @@ type CheckInContextValue = {
   checkIns: CheckIn[];
   checkInFeedPosts: FeedPost[];
   hasCheckedInToday: (goalId: string) => boolean;
-  submitCheckIn: (goal: Goal, photoUrl: string) => CheckIn;
+  submitCheckIn: (goal: Goal, photoUrl: string) => Promise<CheckIn>;
 };
 
 const CheckInContext = createContext<CheckInContextValue | undefined>(
@@ -85,7 +86,14 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
 
       if (isMounted) {
         setCheckIns(
-          Array.isArray(storedState?.checkIns) ? storedState.checkIns : [],
+          Array.isArray(storedState?.checkIns)
+            ? storedState.checkIns.map((checkIn) => ({
+                ...checkIn,
+                aiFeedback:
+                  checkIn.aiFeedback ??
+                  'Verification completed for this saved check-in.',
+              }))
+            : [],
         );
         setCheckInFeedPosts(
           Array.isArray(storedState?.checkInFeedPosts)
@@ -126,14 +134,18 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
   );
 
   const submitCheckIn = useCallback(
-    (goal: Goal, photoUrl: string) => {
+    async (goal: Goal, photoUrl: string) => {
       const createdAt = new Date().toISOString();
       const alreadyCountedToday = checkIns.some(
         (checkIn) =>
           checkIn.goalId === goal.id &&
           isSameCalendarDay(checkIn.createdAt, createdAt),
       );
-      const aiConfidence = Math.floor(Math.random() * 21) + 75;
+      const verification = await verifyCheckInPhoto(
+        photoUrl,
+        goal.category,
+        goal.title,
+      );
       const id = `check-in-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
       const checkIn: CheckIn = {
@@ -141,8 +153,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
         goalId: goal.id,
         userId: LOCAL_USER_ID,
         photoUrl,
-        aiConfidence,
-        aiResult: 'approved',
+        ...verification,
         createdAt,
       };
 
@@ -167,7 +178,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       setCheckIns((currentCheckIns) => [checkIn, ...currentCheckIns]);
       setCheckInFeedPosts((currentPosts) => [feedPost, ...currentPosts]);
 
-      if (!alreadyCountedToday) {
+      if (verification.aiResult === 'approved' && !alreadyCountedToday) {
         incrementGoalCompletedDays(goal.id);
       }
 

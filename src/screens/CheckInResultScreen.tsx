@@ -67,7 +67,8 @@ export function CheckInResultScreen({
         <View style={styles.notice}>
           <Ionicons color={colors.ink} name="information-circle-outline" size={18} />
           <Text style={styles.noticeText}>
-            This confidence score is randomly generated for the local MVP.
+            {checkIn?.aiFeedback ??
+              'This confidence score is randomly generated for the local MVP.'}
           </Text>
         </View>
       </View>

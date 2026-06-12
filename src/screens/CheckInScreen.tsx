@@ -77,7 +77,7 @@ export function CheckInScreen({
 
     setIsSubmitting(true);
     const storedPhotoUri = await persistCheckInPhoto(photoUri);
-    const checkIn = submitCheckIn(goal, storedPhotoUri);
+    const checkIn = await submitCheckIn(goal, storedPhotoUri);
     navigation.replace('CheckInResult', { checkInId: checkIn.id });
   }
 
