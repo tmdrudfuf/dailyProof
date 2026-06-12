@@ -17,6 +17,7 @@ type GoalContextValue = {
   activeGoals: Goal[];
   canAddGoal: boolean;
   addGoal: (goal: NewGoal) => boolean;
+  deleteGoal: (goalId: string) => void;
 };
 
 const GoalContext = createContext<GoalContextValue | undefined>(undefined);
@@ -53,9 +54,15 @@ export function GoalProvider({ children }: GoalProviderProps) {
     [canAddGoal],
   );
 
+  const deleteGoal = useCallback((goalId: string) => {
+    setGoals((currentGoals) =>
+      currentGoals.filter((goal) => goal.id !== goalId),
+    );
+  }, []);
+
   const value = useMemo(
-    () => ({ goals, activeGoals, canAddGoal, addGoal }),
-    [goals, activeGoals, canAddGoal, addGoal],
+    () => ({ goals, activeGoals, canAddGoal, addGoal, deleteGoal }),
+    [goals, activeGoals, canAddGoal, addGoal, deleteGoal],
   );
 
   return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;

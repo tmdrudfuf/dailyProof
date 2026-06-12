@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TimeWheelPicker } from '../components/TimeWheelPicker';
 import { useGoals } from '../context/GoalContext';
 import { colors, radii } from '../theme';
 import {
@@ -66,11 +67,13 @@ const visibilityOptions: {
   },
 ];
 
+const successPercentageOptions = [60, 70, 80, 90, 100];
+
 const steps = [
   { eyebrow: 'STEP 1', title: 'Choose a category', subtitle: 'What kind of promise are you making?' },
   { eyebrow: 'STEP 2', title: 'Name your goal', subtitle: 'Make it clear, specific, and easy to remember.' },
   { eyebrow: 'STEP 3', title: 'Set the duration', subtitle: 'Choose when this commitment starts and ends.' },
-  { eyebrow: 'STEP 4', title: 'Define success', subtitle: 'How many completed days will count as success?' },
+  { eyebrow: 'STEP 4', title: 'Define success', subtitle: 'Choose the percentage of days you want to complete.' },
   { eyebrow: 'STEP 5', title: 'Pick a reminder', subtitle: 'Choose a daily time that supports your routine.' },
   { eyebrow: 'STEP 6', title: 'Who can see it?', subtitle: 'Friends is selected by default.' },
 ];
@@ -94,6 +97,21 @@ function isValidDate(value: string) {
     !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
 }
 
+function getTotalDays(startDate: string, endDate: string) {
+  if (!isValidDate(startDate) || !isValidDate(endDate)) {
+    return 0;
+  }
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (end < start) {
+    return 0;
+  }
+
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  return Math.floor((end.getTime() - start.getTime()) / millisecondsPerDay) + 1;
+}
+
 export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
   const { addGoal, canAddGoal } = useGoals();
   const initialDates = getInitialDates();
@@ -102,12 +120,14 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState(initialDates.startDate);
   const [endDate, setEndDate] = useState(initialDates.endDate);
-  const [successTarget, setSuccessTarget] = useState('');
+  const [successPercentage, setSuccessPercentage] = useState(80);
   const [reminderTime, setReminderTime] = useState('9:00 AM');
   const [visibility, setVisibility] = useState<GoalVisibility>('Friends');
   const [error, setError] = useState('');
 
   const currentStep = steps[step];
+  const totalGoalDays = getTotalDays(startDate, endDate);
+  const successTarget = Math.ceil(totalGoalDays * (successPercentage / 100));
 
   function validateCurrentStep() {
     if (step === 0 && !category) {
@@ -127,11 +147,8 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
       }
     }
 
-    if (
-      step === 3 &&
-      (!Number.isInteger(Number(successTarget)) || Number(successTarget) < 1)
-    ) {
-      return 'Enter a target of at least 1 completed day.';
+    if (step === 3 && successTarget < 1) {
+      return 'Set a valid goal duration before choosing a success target.';
     }
 
     if (step === 4 && !reminderTime.trim()) {
@@ -173,7 +190,7 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
       title: title.trim(),
       startDate,
       endDate,
-      successTarget: Number(successTarget),
+      successTarget,
       reminderTime: reminderTime.trim(),
       visibility,
     };
@@ -287,22 +304,51 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
     if (step === 3) {
       return (
         <View style={styles.formGroup}>
-          <Text style={styles.inputLabel}>TARGET COMPLETED DAYS</Text>
-          <TextInput
-            autoFocus
-            keyboardType="number-pad"
-            onChangeText={(value) => {
-              setSuccessTarget(value.replace(/[^0-9]/g, ''));
-              setError('');
-            }}
-            placeholder="e.g. 24"
-            placeholderTextColor="#9A9D95"
-            style={[styles.input, styles.numberInput]}
-            value={successTarget}
-          />
+          <Text style={styles.inputLabel}>SUCCESS RATE</Text>
+          <View style={styles.percentageOptions}>
+            {successPercentageOptions.map((percentage) => {
+              const selected = successPercentage === percentage;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  key={percentage}
+                  onPress={() => {
+                    setSuccessPercentage(percentage);
+                    setError('');
+                  }}
+                  style={({ pressed }) => [
+                    styles.percentageOption,
+                    selected && styles.percentageOptionSelected,
+                    pressed && styles.optionPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.percentageOptionText,
+                      selected && styles.percentageOptionTextSelected,
+                    ]}
+                  >
+                    {percentage}%
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.successSummary}>
+            <Text style={styles.successPercentage}>{successPercentage}%</Text>
+            <Text style={styles.successSummaryTitle}>
+              {totalGoalDays} days total · {successTarget} proof days
+            </Text>
+            <Text style={styles.successSummaryText}>
+              Complete at least {successTarget} of {totalGoalDays} days to
+              achieve this goal.
+            </Text>
+          </View>
           <Text style={styles.fieldHelp}>
-            You do not need a perfect streak. Set the number of days that makes
-            this goal meaningful.
+            Proof days are rounded up so your completed days always meet the
+            percentage you selected.
           </Text>
         </View>
       );
@@ -312,19 +358,16 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
       return (
         <View style={styles.formGroup}>
           <Text style={styles.inputLabel}>DAILY REMINDER</Text>
-          <View style={styles.inputWithIcon}>
-            <Ionicons color={colors.muted} name="alarm-outline" size={20} />
-            <TextInput
-              autoFocus
-              onChangeText={(value) => {
-                setReminderTime(value);
-                setError('');
-              }}
-              placeholder="9:00 AM"
-              placeholderTextColor="#9A9D95"
-              style={styles.iconInput}
-              value={reminderTime}
-            />
+          <TimeWheelPicker
+            onChange={(value) => {
+              setReminderTime(value);
+              setError('');
+            }}
+            value={reminderTime}
+          />
+          <View style={styles.selectedTime}>
+            <Ionicons color={colors.ink} name="alarm-outline" size={18} />
+            <Text style={styles.selectedTimeText}>{reminderTime}</Text>
           </View>
           <Text style={styles.fieldHelp}>
             This is saved with your goal. Notifications are not enabled yet.
@@ -597,9 +640,58 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 16,
   },
-  numberInput: {
-    fontSize: 24,
+  percentageOptions: {
+    flexDirection: 'row',
+    gap: 7,
+  },
+  percentageOption: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.small,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  percentageOptionSelected: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  percentageOptionText: {
+    color: colors.muted,
+    fontSize: 13,
     fontWeight: '800',
+  },
+  percentageOptionTextSelected: {
+    color: colors.surface,
+  },
+  successSummary: {
+    alignItems: 'center',
+    backgroundColor: colors.softGreen,
+    borderRadius: radii.large,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 24,
+  },
+  successPercentage: {
+    color: colors.ink,
+    fontSize: 42,
+    fontWeight: '900',
+    letterSpacing: -1.8,
+  },
+  successSummaryTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 5,
+  },
+  successSummaryText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 7,
+    textAlign: 'center',
   },
   characterCount: {
     color: colors.muted,
@@ -646,6 +738,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 12,
     paddingHorizontal: 3,
+  },
+  selectedTime: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  selectedTimeText: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '900',
   },
   visibilityList: {
     gap: 10,

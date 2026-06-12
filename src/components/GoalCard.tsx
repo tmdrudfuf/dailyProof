@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii } from '../theme';
 import { Goal } from '../types/goal';
 
 type GoalCardProps = {
   goal: Goal;
+  onDelete?: () => void;
 };
 
 function parseDate(date: string) {
@@ -34,7 +35,7 @@ function getGoalDuration(goal: Goal) {
   return { currentDay, totalDays };
 }
 
-export function GoalCard({ goal }: GoalCardProps) {
+export function GoalCard({ goal, onDelete }: GoalCardProps) {
   const { currentDay, totalDays } = getGoalDuration(goal);
   const progress = Math.min(
     goal.completedDays / Math.max(goal.successTarget, 1),
@@ -51,9 +52,24 @@ export function GoalCard({ goal }: GoalCardProps) {
           <Text style={styles.category}>{goal.category.toUpperCase()}</Text>
           <Text style={styles.title}>{goal.title}</Text>
         </View>
-        <View style={styles.activeBadge}>
-          <View style={styles.activeDot} />
-          <Text style={styles.activeText}>ACTIVE</Text>
+        <View style={styles.headerActions}>
+          <View style={styles.activeBadge}>
+            <View style={styles.activeDot} />
+            <Text style={styles.activeText}>ACTIVE</Text>
+          </View>
+          {onDelete ? (
+            <Pressable
+              accessibilityLabel={`Delete ${goal.title}`}
+              hitSlop={8}
+              onPress={onDelete}
+              style={({ pressed }) => [
+                styles.deleteButton,
+                pressed && styles.deleteButtonPressed,
+              ]}
+            >
+              <Ionicons color="#A23A32" name="trash-outline" size={18} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -140,6 +156,22 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 9,
     paddingVertical: 6,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 7,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: '#F8E8E5',
+    borderRadius: 14,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  deleteButtonPressed: {
+    opacity: 0.55,
   },
   activeDot: {
     backgroundColor: colors.accentDark,

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -20,7 +21,22 @@ type MyGoalsScreenProps = NativeStackScreenProps<
 >;
 
 export function MyGoalsScreen({ navigation }: MyGoalsScreenProps) {
-  const { activeGoals, canAddGoal } = useGoals();
+  const { activeGoals, canAddGoal, deleteGoal } = useGoals();
+
+  function confirmDelete(goalId: string, goalTitle: string) {
+    Alert.alert(
+      'Delete goal?',
+      `"${goalTitle}" and its local progress will be removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteGoal(goalId),
+        },
+      ],
+    );
+  }
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -101,7 +117,12 @@ export function MyGoalsScreen({ navigation }: MyGoalsScreenProps) {
             <Text style={styles.sectionTitle}>ACTIVE GOALS</Text>
           </>
         }
-        renderItem={({ item }) => <GoalCard goal={item} />}
+        renderItem={({ item }) => (
+          <GoalCard
+            goal={item}
+            onDelete={() => confirmDelete(item.id, item.title)}
+          />
+        )}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
