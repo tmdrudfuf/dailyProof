@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
 import { ProfileMenuItem } from '../components/ProfileMenuItem';
+import { useFriends } from '../context/FriendContext';
 import { useGoals } from '../context/GoalContext';
 import { colors, radii } from '../theme';
 import { ProfileStackParamList } from '../types/navigation';
@@ -26,6 +27,7 @@ const week = [
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { activeGoals } = useGoals();
+  const { friends } = useFriends();
   const menuItems = [
     {
       label: 'My Goals',
@@ -34,7 +36,12 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       onPress: () => navigation.navigate('MyGoals'),
     },
     { label: 'History', icon: 'time-outline' as const, value: '48 proofs' },
-    { label: 'Friends', icon: 'people-outline' as const, value: '24' },
+    {
+      label: 'Friends',
+      icon: 'people-outline' as const,
+      value: `${friends.length}`,
+      onPress: () => navigation.navigate('Friends'),
+    },
     { label: 'Settings', icon: 'settings-outline' as const },
   ];
 
@@ -69,7 +76,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           </View>
           <View style={styles.divider} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statValue}>{friends.length}</Text>
             <Text style={styles.statLabel}>FRIENDS</Text>
           </View>
         </View>

@@ -1,12 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii } from '../theme';
 import { FeedPost } from '../types/feed';
+import {
+  FriendComment,
+  FriendReaction,
+  reactionEmojis,
+  ReactionEmoji,
+} from '../types/friend';
 import { Avatar } from './Avatar';
 
 type FeedCardProps = {
   post: FeedPost;
+  friendComments?: FriendComment[];
+  friendReactions?: FriendReaction[];
+  selectedReactions?: ReactionEmoji[];
+  onToggleReaction?: (reaction: ReactionEmoji) => void;
 };
 
 const visualConfig = {
@@ -30,8 +41,36 @@ const visualConfig = {
   },
 };
 
-export function FeedCard({ post }: FeedCardProps) {
+export function FeedCard({
+  post,
+  friendComments = [],
+  friendReactions = [],
+  selectedReactions = [],
+  onToggleReaction,
+}: FeedCardProps) {
   const visual = visualConfig[post.visual];
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [showAllReactions, setShowAllReactions] = useState(false);
+  const visibleComments = showAllComments
+    ? friendComments
+    : friendComments.slice(0, 1);
+  const visibleReactions: FriendReaction[] = [
+    ...friendReactions,
+    ...selectedReactions
+      .filter(
+        (reaction) =>
+          !friendReactions.some(
+            (item) =>
+              item.friendId === 'local-user' &&
+              item.reaction === reaction
+          )
+      )
+      .map((reaction) => ({
+        friendId: 'local-user',
+        displayName: 'You',
+        reaction,
+      })),
+  ];
 
   return (
     <View style={styles.card}>
@@ -40,7 +79,8 @@ export function FeedCard({ post }: FeedCardProps) {
         <View style={styles.friendDetails}>
           <Text style={styles.friendName}>{post.friendName}</Text>
           <Text style={styles.time}>
-            {post.goal} · {post.timeAgo}
+            {post.categoryEmoji ? `${post.categoryEmoji} ` : ''}
+            {post.goal} | {post.timeAgo}
           </Text>
         </View>
         <Pressable accessibilityLabel="More options" hitSlop={12}>
@@ -57,12 +97,15 @@ export function FeedCard({ post }: FeedCardProps) {
               source={{ uri: post.photoUrl }}
               style={styles.checkInPhotoImage}
             />
-          ) : null}
-          <View style={styles.mockSun} />
-          <View style={styles.mockGround} />
-          <Text style={styles.mockPhotoEmoji}>
-            {post.categoryEmoji ?? '✨'}
-          </Text>
+          ) : (
+            <>
+              <View style={styles.mockSun} />
+              <View style={styles.mockGround} />
+              <Text style={styles.mockPhotoEmoji}>
+                {post.categoryEmoji ?? '✨'}
+              </Text>
+            </>
+          )}
           <View style={styles.mockPhotoBadge}>
             <Text style={styles.mockPhotoBadgeText}>CAPTURED PROOF</Text>
           </View>
@@ -77,40 +120,153 @@ export function FeedCard({ post }: FeedCardProps) {
         </View>
       )}
 
-      {post.isCheckIn ? (
-        <View style={styles.checkInActions}>
-          <View style={styles.emojiReactions}>
-            <Text style={styles.reactionEmoji}>🔥</Text>
-            <Text style={styles.reactionEmoji}>💪</Text>
-            <Text style={styles.reactionEmoji}>👏</Text>
-          </View>
-          <View style={styles.verifiedBadge}>
-            <Ionicons color={colors.ink} name="checkmark-circle" size={16} />
-            <Text style={styles.verifiedText}>VERIFIED</Text>
-          </View>
+      <View style={styles.actions}>
+        <View style={styles.reactionList}>
+          {reactionEmojis.map((reaction) => {
+            const isSelected = selectedReactions.includes(reaction);
+
+            return (
+              <Pressable
+                accessibilityLabel={`React with ${reaction}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                key={reaction}
+                onPress={() => onToggleReaction?.(reaction)}
+                style={[
+                  styles.reactionButton,
+                  isSelected && styles.reactionButtonSelected,
+                ]}
+              >
+                <Text style={styles.reactionEmoji}>{reaction}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-      ) : (
-        <View style={styles.actions}>
-          <View style={styles.reactions}>
-            <Pressable accessibilityLabel="Cheer this proof" style={styles.actionButton}>
-              <Ionicons color={colors.ink} name="heart-outline" size={22} />
-            </Pressable>
-            <Text style={styles.reactionCount}>{post.reactions}</Text>
-            <Pressable accessibilityLabel="Comment on this proof" style={styles.actionButton}>
-              <Ionicons color={colors.ink} name="chatbubble-outline" size={20} />
-            </Pressable>
-          </View>
-          <View style={styles.streak}>
-            <Ionicons color={colors.ink} name="flame-outline" size={16} />
-            <Text style={styles.streakText}>{post.streak} day streak</Text>
-          </View>
+        <View style={styles.verifiedBadge}>
+          <Ionicons color={colors.ink} name="checkmark-circle" size={16} />
+          <Text style={styles.verifiedText}>VERIFIED</Text>
         </View>
-      )}
+      </View>
+
+      {friendReactions.length > 0 || friendComments.length > 0 ? (
+        <View style={styles.activityVisibility}>
+          <Ionicons color={colors.muted} name="people-outline" size={13} />
+          <Text style={styles.activityVisibilityText}>
+            Friends can see reactions and comments
+          </Text>
+        </View>
+      ) : null}
+
+      {visibleReactions.length > 0 ? (
+        <>
+          <Pressable
+            accessibilityLabel={
+              showAllReactions
+                ? 'Hide everyone who reacted'
+                : 'Show everyone who reacted'
+            }
+            accessibilityRole="button"
+            onPress={() => setShowAllReactions((current) => !current)}
+            style={styles.friendReactionSummary}
+          >
+          <View style={styles.reactorAvatars}>
+            {visibleReactions.slice(0, 3).map((item, index) => (
+              <View
+                key={`${item.friendId}-${item.reaction}`}
+                style={[
+                  styles.reactorAvatar,
+                  index > 0 && styles.reactorAvatarOverlap,
+                ]}
+              >
+                <Text style={styles.reactorInitial}>
+                  {item.displayName.slice(0, 1)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.friendReactionText}>
+            {visibleReactions
+              .slice(0, 2)
+              .map((item) => `${item.displayName} ${item.reaction}`)
+              .join(', ')}
+            {visibleReactions.length > 2
+              ? ` and ${visibleReactions.length - 2} more reacted`
+              : ' reacted'}
+          </Text>
+            <Ionicons
+              color={colors.muted}
+              name={showAllReactions ? 'chevron-up' : 'chevron-down'}
+              size={16}
+            />
+          </Pressable>
+
+          {showAllReactions ? (
+            <View style={styles.reactionDetails}>
+              <Text style={styles.reactionDetailsTitle}>
+                ALL REACTIONS
+              </Text>
+              {visibleReactions.map((item) => (
+                <View
+                  key={`${item.friendId}-${item.reaction}-detail`}
+                  style={styles.reactionDetailRow}
+                >
+                  <View style={styles.reactionDetailAvatar}>
+                    <Text style={styles.reactorInitial}>
+                      {item.displayName.slice(0, 1)}
+                    </Text>
+                  </View>
+                  <Text style={styles.reactionDetailName}>
+                    {item.displayName}
+                  </Text>
+                  <Text style={styles.reactionDetailEmoji}>
+                    {item.reaction}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </>
+      ) : null}
 
       <Text style={styles.description}>
         <Text style={styles.friendName}>{post.friendName} </Text>
         {post.proof}
       </Text>
+
+      {friendComments.length > 0 ? (
+        <View style={styles.comments}>
+          {friendComments.length > 1 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setShowAllComments((current) => !current)}
+            >
+              <Text style={styles.viewComments}>
+                {showAllComments
+                  ? 'Hide comments'
+                  : `View all ${friendComments.length} comments`}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {visibleComments.map((comment) => (
+            <View key={comment.id} style={styles.commentRow}>
+              <View style={styles.commentAvatar}>
+                <Text style={styles.commentInitial}>
+                  {comment.displayName.slice(0, 1)}
+                </Text>
+              </View>
+              <View style={styles.commentBubble}>
+                <Text style={styles.commentText}>
+                  <Text style={styles.commentName}>
+                    {comment.displayName}{' '}
+                  </Text>
+                  {comment.message}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -163,7 +319,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     width: '100%',
-    zIndex: 2,
   },
   mockSun: {
     backgroundColor: '#FFE173',
@@ -184,7 +339,6 @@ const styles = StyleSheet.create({
   },
   mockPhotoEmoji: {
     fontSize: 76,
-    zIndex: 1,
   },
   mockPhotoBadge: {
     backgroundColor: colors.ink,
@@ -194,7 +348,6 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     position: 'absolute',
     right: 16,
-    zIndex: 3,
   },
   mockPhotoBadgeText: {
     color: colors.surface,
@@ -231,50 +384,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingTop: 12,
   },
-  reactions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 5,
-  },
-  actionButton: {
-    padding: 3,
-  },
-  reactionCount: {
-    color: colors.ink,
-    fontSize: 12,
-    fontWeight: '800',
-    marginRight: 6,
-  },
-  streak: {
-    alignItems: 'center',
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
+  reactionList: {
     flexDirection: 'row',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
-  streakText: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  checkInActions: {
+  reactionButton: {
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 12,
+    borderColor: 'transparent',
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
-  emojiReactions: {
-    flexDirection: 'row',
-    gap: 10,
+  reactionButtonSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.ink,
   },
   reactionEmoji: {
-    fontSize: 20,
+    fontSize: 17,
   },
   verifiedBadge: {
     alignItems: 'center',
@@ -291,12 +422,149 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.7,
   },
+  friendReactionSummary: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: radii.medium,
+    flexDirection: 'row',
+    marginHorizontal: 14,
+    marginTop: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  activityVisibility: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    marginHorizontal: 15,
+    marginTop: 11,
+  },
+  activityVisibilityText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  reactorAvatars: {
+    flexDirection: 'row',
+    marginRight: 9,
+  },
+  reactorAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.softGreen,
+    borderColor: colors.surface,
+    borderRadius: 13,
+    borderWidth: 2,
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
+  },
+  reactorAvatarOverlap: {
+    marginLeft: -7,
+  },
+  reactorInitial: {
+    color: colors.ink,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  friendReactionText: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reactionDetails: {
+    borderColor: colors.line,
+    borderRadius: radii.medium,
+    borderWidth: 1,
+    marginHorizontal: 14,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  reactionDetailsTitle: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
+    paddingHorizontal: 12,
+    paddingTop: 11,
+  },
+  reactionDetailRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 45,
+    paddingHorizontal: 12,
+  },
+  reactionDetailAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.softGreen,
+    borderRadius: 13,
+    height: 26,
+    justifyContent: 'center',
+    marginRight: 9,
+    width: 26,
+  },
+  reactionDetailName: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  reactionDetailEmoji: {
+    fontSize: 19,
+  },
   description: {
     color: colors.ink,
     fontSize: 13,
     lineHeight: 19,
-    paddingBottom: 16,
+    paddingBottom: 14,
     paddingHorizontal: 16,
     paddingTop: 11,
+  },
+  comments: {
+    borderTopColor: colors.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 14,
+    paddingBottom: 15,
+    paddingTop: 11,
+  },
+  viewComments: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  commentRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    marginTop: 7,
+  },
+  commentAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.softBlue,
+    borderRadius: 13,
+    height: 26,
+    justifyContent: 'center',
+    marginRight: 8,
+    width: 26,
+  },
+  commentInitial: {
+    color: colors.ink,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  commentBubble: {
+    backgroundColor: colors.background,
+    borderRadius: radii.small,
+    flex: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  commentText: {
+    color: colors.ink,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  commentName: {
+    fontWeight: '900',
   },
 });

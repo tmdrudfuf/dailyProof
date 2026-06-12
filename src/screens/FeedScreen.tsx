@@ -5,8 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '../components/Avatar';
 import { FeedCard } from '../components/FeedCard';
 import { useCheckIns } from '../context/CheckInContext';
+import { useFriends } from '../context/FriendContext';
 import { useGoals } from '../context/GoalContext';
-import { mockFeedPosts } from '../services/mockFeed';
+import {
+  getMockCommentsForPost,
+  getMockFriendCheckIns,
+  getMockReactionsForPost,
+} from '../services/friendService';
 import { colors, radii } from '../theme';
 
 function getCheckInTime(createdAt?: string) {
@@ -27,12 +32,21 @@ function getCheckInTime(createdAt?: string) {
 
 export function FeedScreen() {
   const { checkInFeedPosts, hasCheckedInToday } = useCheckIns();
+  const { reactions, toggleReaction } = useFriends();
   const { activeGoals } = useGoals();
   const restoredCheckInPosts = checkInFeedPosts.map((post) => ({
     ...post,
     timeAgo: getCheckInTime(post.createdAt),
   }));
-  const feedPosts = [...restoredCheckInPosts, ...mockFeedPosts];
+  const friendCheckInPosts = getMockFriendCheckIns().map((post) => ({
+    ...post,
+    timeAgo: getCheckInTime(post.createdAt),
+  }));
+  const feedPosts = [...restoredCheckInPosts, ...friendCheckInPosts].sort(
+    (first, second) =>
+      new Date(second.createdAt ?? 0).getTime() -
+      new Date(first.createdAt ?? 0).getTime()
+  );
   const provedGoalCount = activeGoals.filter((goal) =>
     hasCheckedInToday(goal.id),
   ).length;
@@ -122,7 +136,23 @@ export function FeedScreen() {
             </View>
           </>
         }
-        renderItem={({ item }) => <FeedCard post={item} />}
+        renderItem={({ item }) => (
+          <FeedCard
+            friendComments={getMockCommentsForPost(
+              item.id,
+              item.friendId
+            )}
+            friendReactions={getMockReactionsForPost(
+              item.id,
+              item.friendId
+            )}
+            onToggleReaction={(reaction) =>
+              toggleReaction(item.id, reaction)
+            }
+            post={item}
+            selectedReactions={reactions[item.id]}
+          />
+        )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
       />

@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { CheckInProvider } from './src/context/CheckInContext';
+import { FriendProvider } from './src/context/FriendContext';
 import { GoalProvider } from './src/context/GoalContext';
 
 export default function App() {
@@ -11,10 +12,12 @@ export default function App() {
     <SafeAreaProvider>
       <GoalProvider>
         <CheckInProvider>
-          <NavigationContainer>
-            <StatusBar style="dark" />
-            <AppNavigator />
-          </NavigationContainer>
+          <FriendProvider>
+            <NavigationContainer>
+              <StatusBar style="dark" />
+              <AppNavigator />
+            </NavigationContainer>
+          </FriendProvider>
         </CheckInProvider>
       </GoalProvider>
     </SafeAreaProvider>

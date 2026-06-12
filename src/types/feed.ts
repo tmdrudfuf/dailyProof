@@ -1,5 +1,6 @@
 export type FeedPost = {
   id: string;
+  friendId?: string;
   friendName: string;
   initials: string;
   goal: string;

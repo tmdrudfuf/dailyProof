@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const storageKeys = {
   goals: '@dailyproof/goals',
   checkInState: '@dailyproof/check-in-state',
+  friendReactions: '@dailyproof/friend-reactions',
 } as const;
 
 export async function readStoredJson<T>(

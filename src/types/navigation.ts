@@ -4,6 +4,7 @@ export type ProfileStackParamList = {
   ProfileHome: undefined;
   MyGoals: undefined;
   CreateGoal: undefined;
+  Friends: undefined;
 };
 
 export type CameraStackParamList = {
