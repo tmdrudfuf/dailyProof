@@ -8,6 +8,7 @@ type ProfileMenuItemProps = {
   label: string;
   value?: string;
   isLast?: boolean;
+  onPress?: () => void;
 };
 
 export function ProfileMenuItem({
@@ -15,10 +16,12 @@ export function ProfileMenuItem({
   label,
   value,
   isLast = false,
+  onPress,
 }: ProfileMenuItemProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      onPress={onPress}
       style={({ pressed }) => [
         styles.row,
         !isLast && styles.border,

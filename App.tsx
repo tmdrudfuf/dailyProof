@@ -3,14 +3,17 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { GoalProvider } from './src/context/GoalContext';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="dark" />
-        <AppNavigator />
-      </NavigationContainer>
+      <GoalProvider>
+        <NavigationContainer>
+          <StatusBar style="dark" />
+          <AppNavigator />
+        </NavigationContainer>
+      </GoalProvider>
     </SafeAreaProvider>
   );
 }

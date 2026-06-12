@@ -1,17 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
 import { ProfileMenuItem } from '../components/ProfileMenuItem';
+import { useGoals } from '../context/GoalContext';
 import { colors, radii } from '../theme';
+import { ProfileStackParamList } from '../types/navigation';
 
-const menuItems = [
-  { label: 'My Goals', icon: 'flag-outline' as const, value: '2 active' },
-  { label: 'History', icon: 'time-outline' as const, value: '48 proofs' },
-  { label: 'Friends', icon: 'people-outline' as const, value: '24' },
-  { label: 'Settings', icon: 'settings-outline' as const },
-];
+type ProfileScreenProps = NativeStackScreenProps<
+  ProfileStackParamList,
+  'ProfileHome'
+>;
 
 const week = [
   { day: 'M', done: true },
@@ -23,7 +24,20 @@ const week = [
   { day: 'S', done: false },
 ];
 
-export function ProfileScreen() {
+export function ProfileScreen({ navigation }: ProfileScreenProps) {
+  const { activeGoals } = useGoals();
+  const menuItems = [
+    {
+      label: 'My Goals',
+      icon: 'flag-outline' as const,
+      value: `${activeGoals.length} active`,
+      onPress: () => navigation.navigate('MyGoals'),
+    },
+    { label: 'History', icon: 'time-outline' as const, value: '48 proofs' },
+    { label: 'Friends', icon: 'people-outline' as const, value: '24' },
+    { label: 'Settings', icon: 'settings-outline' as const },
+  ];
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -92,6 +106,7 @@ export function ProfileScreen() {
               isLast={index === menuItems.length - 1}
               key={item.label}
               label={item.label}
+              onPress={item.onPress}
               value={item.value}
             />
           ))}

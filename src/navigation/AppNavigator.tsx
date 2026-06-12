@@ -4,9 +4,9 @@ import { StyleSheet, View } from 'react-native';
 
 import { CameraScreen } from '../screens/CameraScreen';
 import { FeedScreen } from '../screens/FeedScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '../theme';
 import { RootTabParamList } from '../types/navigation';
+import { ProfileNavigator } from './ProfileNavigator';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
@@ -54,7 +54,7 @@ export function AppNavigator() {
     >
       <Tab.Screen component={FeedScreen} name="Feed" />
       <Tab.Screen component={CameraScreen} name="Camera" />
-      <Tab.Screen component={ProfileScreen} name="Profile" />
+      <Tab.Screen component={ProfileNavigator} name="Profile" />
     </Tab.Navigator>
   );
 }
