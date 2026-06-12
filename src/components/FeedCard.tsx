@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii } from '../theme';
 import { FeedPost } from '../types/feed';
@@ -50,13 +50,21 @@ export function FeedCard({ post }: FeedCardProps) {
 
       {post.isCheckIn ? (
         <View style={styles.mockPhoto}>
+          {post.photoUrl ? (
+            <Image
+              accessibilityLabel={`${post.goal} check-in photo`}
+              resizeMode="cover"
+              source={{ uri: post.photoUrl }}
+              style={styles.checkInPhotoImage}
+            />
+          ) : null}
           <View style={styles.mockSun} />
           <View style={styles.mockGround} />
           <Text style={styles.mockPhotoEmoji}>
             {post.categoryEmoji ?? '✨'}
           </Text>
           <View style={styles.mockPhotoBadge}>
-            <Text style={styles.mockPhotoBadgeText}>MOCK PHOTO</Text>
+            <Text style={styles.mockPhotoBadgeText}>CAPTURED PROOF</Text>
           </View>
         </View>
       ) : (
@@ -149,6 +157,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  checkInPhotoImage: {
+    height: '100%',
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: '100%',
+    zIndex: 2,
+  },
   mockSun: {
     backgroundColor: '#FFE173',
     borderRadius: 45,
@@ -178,6 +194,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     position: 'absolute',
     right: 16,
+    zIndex: 3,
   },
   mockPhotoBadgeText: {
     color: colors.surface,

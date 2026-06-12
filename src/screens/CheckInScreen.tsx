@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -20,15 +22,16 @@ type CheckInScreenProps = NativeStackScreenProps<
   'CheckIn'
 >;
 
-const MOCK_PHOTO_URL = 'mock://dailyproof/check-in-photo';
-
 export function CheckInScreen({
   navigation,
   route,
 }: CheckInScreenProps) {
   const { goals } = useGoals();
   const { hasCheckedInToday, submitCheckIn } = useCheckIns();
-  const [hasPhoto, setHasPhoto] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const goal = goals.find((item) => item.id === route.params.goalId);
   const provedToday = goal ? hasCheckedInToday(goal.id) : false;
@@ -36,24 +39,126 @@ export function CheckInScreen({
   if (!goal) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.missingState}>
-          <Text style={styles.missingTitle}>Goal not found.</Text>
-          <Pressable onPress={() => navigation.goBack()} style={styles.simpleButton}>
-            <Text style={styles.simpleButtonText}>Go Back</Text>
+        <View style={styles.centeredState}>
+          <Text style={styles.stateTitle}>Goal not found.</Text>
+          <Pressable onPress={() => navigation.goBack()} style={styles.stateButton}>
+            <Text style={styles.stateButtonText}>Go Back</Text>
           </Pressable>
         </View>
       </SafeAreaView>
     );
   }
 
+  async function handleCapture() {
+    if (!cameraRef.current || isCapturing) {
+      return;
+    }
+
+    try {
+      setIsCapturing(true);
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        skipProcessing: false,
+      });
+
+      if (photo?.uri) {
+        setPhotoUri(photo.uri);
+      }
+    } finally {
+      setIsCapturing(false);
+    }
+  }
+
   function handleSubmit() {
-    if (!hasPhoto || isSubmitting || !goal) {
+    if (!photoUri || isSubmitting || !goal) {
       return;
     }
 
     setIsSubmitting(true);
-    const checkIn = submitCheckIn(goal, MOCK_PHOTO_URL);
+    const checkIn = submitCheckIn(goal, photoUri);
     navigation.replace('CheckInResult', { checkInId: checkIn.id });
+  }
+
+  function renderCamera() {
+    if (!goal) {
+      return null;
+    }
+
+    if (!permission) {
+      return (
+        <View style={styles.centeredState}>
+          <ActivityIndicator color={colors.accent} size="large" />
+          <Text style={styles.stateText}>Checking camera permission...</Text>
+        </View>
+      );
+    }
+
+    if (!permission.granted) {
+      return (
+        <View style={styles.centeredState}>
+          <View style={styles.permissionIcon}>
+            <Ionicons color={colors.ink} name="camera-outline" size={34} />
+          </View>
+          <Text style={styles.stateTitle}>Camera access is required</Text>
+          <Text style={styles.stateText}>
+            DailyProof needs camera permission to capture proof photos. Gallery
+            uploads are not available.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={requestPermission}
+            style={({ pressed }) => [
+              styles.permissionButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.permissionButtonText}>Allow Camera</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.cameraShell}>
+        <View style={styles.cameraViewport}>
+          <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+          <View style={styles.cameraOverlay}>
+            <View style={styles.goalPill}>
+              <Text style={styles.goalPillEmoji}>{goal.categoryEmoji}</Text>
+              <Text numberOfLines={1} style={styles.goalPillText}>
+                {goal.title}
+              </Text>
+            </View>
+            <View style={styles.guideFrame}>
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+            </View>
+            <Text style={styles.cameraHint}>Frame the action that proves it.</Text>
+          </View>
+        </View>
+
+        <View style={styles.captureControls}>
+          <Pressable
+            accessibilityLabel="Take proof photo"
+            accessibilityRole="button"
+            disabled={isCapturing}
+            onPress={handleCapture}
+            style={({ pressed }) => [
+              styles.captureButton,
+              pressed && styles.captureButtonPressed,
+            ]}
+          >
+            <View style={styles.captureInner}>
+              {isCapturing ? (
+                <ActivityIndicator color={colors.ink} />
+              ) : null}
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -66,82 +171,54 @@ export function CheckInScreen({
         >
           <Ionicons color={colors.ink} name="arrow-back" size={22} />
         </Pressable>
-        <Text style={styles.headerTitle}>Check In</Text>
+        <Text style={styles.headerTitle}>
+          {photoUri ? 'Preview' : 'Take Proof'}
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.label}>SELECTED GOAL</Text>
-        <View style={styles.selectedGoal}>
-          <View style={styles.goalEmoji}>
-            <Text style={styles.goalEmojiText}>{goal.categoryEmoji}</Text>
-          </View>
-          <View>
-            <Text style={styles.goalCategory}>{goal.category}</Text>
-            <Text style={styles.goalTitle}>{goal.title}</Text>
-          </View>
+      {provedToday ? (
+        <View style={styles.alreadyProvedNotice}>
+          <Ionicons
+            color={colors.ink}
+            name="checkmark-circle-outline"
+            size={20}
+          />
+          <Text style={styles.alreadyProvedText}>
+            Already proved today. Another check-in will be added to the feed,
+            but completed days will not increase again.
+          </Text>
         </View>
+      ) : null}
 
-        {provedToday ? (
-          <View style={styles.alreadyProvedNotice}>
-            <Ionicons
-              color={colors.ink}
-              name="checkmark-circle-outline"
-              size={20}
-            />
-            <Text style={styles.alreadyProvedText}>
-              You already proved this goal today. Another check-in will appear
-              in the feed, but completed days will not increase again.
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={[styles.photoCard, hasPhoto && styles.photoCardSelected]}>
-          {hasPhoto ? (
-            <>
-              <View style={styles.mockScene}>
-                <View style={styles.mockSun} />
-                <View style={styles.mockGround} />
-                <Text style={styles.mockEmoji}>{goal.categoryEmoji}</Text>
-              </View>
-              <View style={styles.photoStamp}>
-                <View style={styles.liveDot} />
-                <Text style={styles.photoStampText}>MOCK PROOF</Text>
-              </View>
-            </>
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <View style={styles.placeholderIcon}>
-                <Ionicons color={colors.ink} name="image-outline" size={32} />
-              </View>
-              <Text style={styles.placeholderTitle}>No mock photo selected</Text>
-              <Text style={styles.placeholderText}>
-                This simulates photo capture without using your camera.
-              </Text>
+      {photoUri ? (
+        <View style={styles.previewContent}>
+          <View style={styles.selectedGoal}>
+            <Text style={styles.selectedGoalEmoji}>{goal.categoryEmoji}</Text>
+            <View style={styles.selectedGoalCopy}>
+              <Text style={styles.selectedGoalLabel}>SELECTED GOAL</Text>
+              <Text style={styles.selectedGoalTitle}>{goal.title}</Text>
             </View>
-          )}
-        </View>
+          </View>
 
-        {!hasPhoto ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setHasPhoto(true)}
-            style={({ pressed }) => [
-              styles.selectButton,
-              pressed && styles.buttonPressed,
-            ]}
-          >
-            <Ionicons color={colors.ink} name="images-outline" size={20} />
-            <Text style={styles.selectButtonText}>Select Mock Photo</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.actions}>
+          <View style={styles.previewFrame}>
+            <Image
+              accessibilityLabel="Captured proof preview"
+              resizeMode="cover"
+              source={{ uri: photoUri }}
+              style={styles.previewImage}
+            />
+            <View style={styles.photoStamp}>
+              <View style={styles.liveDot} />
+              <Text style={styles.photoStampText}>CAPTURED PROOF</Text>
+            </View>
+          </View>
+
+          <View style={styles.previewActions}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setHasPhoto(false)}
+              disabled={isSubmitting}
+              onPress={() => setPhotoUri(null)}
               style={({ pressed }) => [
                 styles.retakeButton,
                 pressed && styles.buttonPressed,
@@ -159,27 +236,35 @@ export function CheckInScreen({
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.submitText}>
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </Text>
-              <Ionicons color={colors.ink} name="arrow-forward" size={19} />
+              {isSubmitting ? (
+                <ActivityIndicator color={colors.ink} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.submitText}>Submit</Text>
+                  <Ionicons color={colors.ink} name="arrow-forward" size={19} />
+                </>
+              )}
             </Pressable>
           </View>
-        )}
-      </ScrollView>
+        </View>
+      ) : (
+        renderCamera()
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: colors.background,
+    backgroundColor: '#111310',
     flex: 1,
   },
   topBar: {
     alignItems: 'center',
+    backgroundColor: colors.background,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingBottom: 10,
     paddingHorizontal: 18,
     paddingTop: 8,
   },
@@ -201,17 +286,190 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 42,
   },
-  content: {
-    paddingBottom: 30,
+  alreadyProvedNotice: {
+    alignItems: 'center',
+    backgroundColor: colors.softGreen,
+    borderBottomColor: colors.accentDark,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
     paddingHorizontal: 18,
-    paddingTop: 26,
+    paddingVertical: 11,
   },
-  label: {
-    color: colors.muted,
-    fontSize: 9,
+  alreadyProvedText: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  centeredState: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 34,
+  },
+  permissionIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 31,
+    height: 62,
+    justifyContent: 'center',
+    width: 62,
+  },
+  stateTitle: {
+    color: colors.ink,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 1.2,
-    marginLeft: 3,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  stateText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  stateButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.medium,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+  },
+  stateButtonText: {
+    color: colors.ink,
+    fontWeight: '900',
+  },
+  permissionButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.medium,
+    marginTop: 20,
+    minWidth: 180,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  permissionButtonText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  cameraShell: {
+    flex: 1,
+  },
+  cameraViewport: {
+    flex: 1,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  camera: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 18,
+  },
+  goalPill: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(17, 19, 16, 0.78)',
+    borderRadius: radii.pill,
+    flexDirection: 'row',
+    maxWidth: '90%',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  goalPillEmoji: {
+    fontSize: 17,
+  },
+  goalPillText: {
+    color: colors.surface,
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 7,
+  },
+  guideFrame: {
+    flex: 1,
+    marginVertical: 24,
+    position: 'relative',
+  },
+  corner: {
+    borderColor: colors.accent,
+    height: 32,
+    position: 'absolute',
+    width: 32,
+  },
+  topLeft: {
+    borderLeftWidth: 2,
+    borderTopWidth: 2,
+    left: 0,
+    top: 0,
+  },
+  topRight: {
+    borderRightWidth: 2,
+    borderTopWidth: 2,
+    right: 0,
+    top: 0,
+  },
+  bottomLeft: {
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    bottom: 0,
+    left: 0,
+  },
+  bottomRight: {
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    bottom: 0,
+    right: 0,
+  },
+  cameraHint: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(17, 19, 16, 0.72)',
+    borderRadius: radii.pill,
+    color: colors.surface,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  captureControls: {
+    alignItems: 'center',
+    backgroundColor: '#111310',
+    justifyContent: 'center',
+    minHeight: 118,
+  },
+  captureButton: {
+    alignItems: 'center',
+    borderColor: colors.surface,
+    borderRadius: 40,
+    borderWidth: 3,
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
+  },
+  captureButtonPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
+  },
+  captureInner: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 32,
+    height: 64,
+    justifyContent: 'center',
+    width: 64,
+  },
+  previewContent: {
+    backgroundColor: colors.background,
+    flex: 1,
+    paddingBottom: 16,
+    paddingHorizontal: 18,
+    paddingTop: 14,
   },
   selectedGoal: {
     alignItems: 'center',
@@ -220,124 +478,43 @@ const styles = StyleSheet.create({
     borderRadius: radii.medium,
     borderWidth: 1,
     flexDirection: 'row',
-    marginTop: 9,
-    padding: 13,
+    padding: 11,
   },
-  alreadyProvedNotice: {
-    alignItems: 'center',
-    backgroundColor: colors.softGreen,
-    borderColor: colors.accentDark,
-    borderRadius: radii.medium,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 9,
-    marginTop: 12,
-    padding: 13,
+  selectedGoalEmoji: {
+    fontSize: 24,
+    marginHorizontal: 7,
   },
-  alreadyProvedText: {
-    color: colors.ink,
+  selectedGoalCopy: {
     flex: 1,
-    fontSize: 11,
-    lineHeight: 16,
+    marginLeft: 8,
   },
-  goalEmoji: {
-    alignItems: 'center',
-    backgroundColor: colors.softGreen,
-    borderRadius: 14,
-    height: 46,
-    justifyContent: 'center',
-    marginRight: 12,
-    width: 46,
-  },
-  goalEmojiText: {
-    fontSize: 22,
-  },
-  goalCategory: {
+  selectedGoalLabel: {
     color: colors.muted,
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
-  goalTitle: {
+  selectedGoalTitle: {
     color: colors.ink,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '900',
     marginTop: 2,
   },
-  photoCard: {
-    alignItems: 'center',
-    aspectRatio: 0.86,
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
+  previewFrame: {
+    backgroundColor: colors.dark,
     borderRadius: radii.large,
-    borderStyle: 'dashed',
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    marginTop: 18,
-    maxHeight: 470,
+    flex: 1,
+    marginTop: 14,
     overflow: 'hidden',
     position: 'relative',
   },
-  photoCardSelected: {
-    borderStyle: 'solid',
-  },
-  photoPlaceholder: {
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  placeholderIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.accent,
-    borderRadius: 28,
-    height: 56,
-    justifyContent: 'center',
-    width: 56,
-  },
-  placeholderTitle: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: '900',
-    marginTop: 16,
-  },
-  placeholderText: {
-    color: colors.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 7,
-    textAlign: 'center',
-  },
-  mockScene: {
-    alignItems: 'center',
-    backgroundColor: colors.softBlue,
+  previewImage: {
     height: '100%',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    position: 'relative',
     width: '100%',
-  },
-  mockSun: {
-    backgroundColor: '#FFE173',
-    borderRadius: 44,
-    height: 88,
-    position: 'absolute',
-    right: 34,
-    top: 42,
-    width: 88,
-  },
-  mockGround: {
-    backgroundColor: colors.softGreen,
-    bottom: -50,
-    height: '44%',
-    position: 'absolute',
-    transform: [{ rotate: '-7deg' }],
-    width: '120%',
-  },
-  mockEmoji: {
-    fontSize: 78,
-    zIndex: 1,
   },
   photoStamp: {
     alignItems: 'center',
-    backgroundColor: 'rgba(23, 24, 21, 0.82)',
+    backgroundColor: 'rgba(17, 19, 16, 0.82)',
     borderRadius: radii.pill,
     bottom: 16,
     flexDirection: 'row',
@@ -345,6 +522,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     position: 'absolute',
+    right: 16,
   },
   liveDot: {
     backgroundColor: colors.accent,
@@ -358,25 +536,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
   },
-  selectButton: {
-    alignItems: 'center',
-    backgroundColor: colors.accent,
-    borderRadius: radii.medium,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    marginTop: 16,
-    minHeight: 54,
-  },
-  selectButtonText: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  actions: {
+  previewActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 16,
+    marginTop: 14,
   },
   retakeButton: {
     alignItems: 'center',
@@ -413,26 +576,5 @@ const styles = StyleSheet.create({
   buttonPressed: {
     opacity: 0.65,
     transform: [{ scale: 0.99 }],
-  },
-  missingState: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  missingTitle: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  simpleButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.medium,
-    marginTop: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  simpleButtonText: {
-    color: colors.ink,
-    fontWeight: '900',
   },
 });
