@@ -6,8 +6,14 @@ export type ProfileStackParamList = {
   CreateGoal: undefined;
 };
 
+export type CameraStackParamList = {
+  CameraGoals: undefined;
+  CheckIn: { goalId: string };
+  CheckInResult: { checkInId: string };
+};
+
 export type RootTabParamList = {
   Feed: undefined;
-  Camera: undefined;
+  Camera: NavigatorScreenParams<CameraStackParamList> | undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList> | undefined;
 };

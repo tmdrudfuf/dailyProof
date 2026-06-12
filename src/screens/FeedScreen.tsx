@@ -4,15 +4,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
 import { FeedCard } from '../components/FeedCard';
+import { useCheckIns } from '../context/CheckInContext';
+import { useGoals } from '../context/GoalContext';
 import { mockFeedPosts } from '../services/mockFeed';
 import { colors, radii } from '../theme';
 
 export function FeedScreen() {
+  const { checkInFeedPosts, hasCheckedInToday } = useCheckIns();
+  const { activeGoals } = useGoals();
+  const feedPosts = [...checkInFeedPosts, ...mockFeedPosts];
+  const provedGoalCount = activeGoals.filter((goal) =>
+    hasCheckedInToday(goal.id),
+  ).length;
+  const totalGoalCount = activeGoals.length;
+  const progressPercentage =
+    totalGoalCount === 0 ? 0 : (provedGoalCount / totalGoalCount) * 100;
+  const completedAllGoals =
+    totalGoalCount > 0 && provedGoalCount === totalGoalCount;
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <FlatList
         contentContainerStyle={styles.content}
-        data={mockFeedPosts}
+        data={feedPosts}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <>
@@ -33,16 +47,38 @@ export function FeedScreen() {
             <View style={styles.todayCard}>
               <View style={styles.todayCopy}>
                 <Text style={styles.todayLabel}>YOUR DAY</Text>
-                <Text style={styles.todayTitle}>One promise.{'\n'}Make it visible.</Text>
+                <Text style={styles.todayTitle}>
+                  {completedAllGoals
+                    ? 'All promises kept.'
+                    : 'One promise.'}
+                  {'\n'}
+                  {completedAllGoals ? 'You made it visible.' : 'Make it visible.'}
+                </Text>
                 <View style={styles.progressRow}>
                   <View style={styles.progressTrack}>
-                    <View style={styles.progressFill} />
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${progressPercentage}%` },
+                      ]}
+                    />
                   </View>
-                  <Text style={styles.progressText}>1 of 2</Text>
+                  <Text style={styles.progressText}>
+                    {provedGoalCount} of {totalGoalCount}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.checkMark}>
-                <Ionicons color={colors.ink} name="checkmark" size={28} />
+              <View
+                style={[
+                  styles.checkMark,
+                  provedGoalCount === 0 && styles.checkMarkInactive,
+                ]}
+              >
+                <Ionicons
+                  color={provedGoalCount === 0 ? '#777B74' : colors.ink}
+                  name={completedAllGoals ? 'checkmark-done' : 'checkmark'}
+                  size={28}
+                />
               </View>
             </View>
 
@@ -172,7 +208,6 @@ const styles = StyleSheet.create({
   progressFill: {
     backgroundColor: colors.accent,
     height: '100%',
-    width: '50%',
   },
   progressText: {
     color: '#AEB2A9',
@@ -188,6 +223,9 @@ const styles = StyleSheet.create({
     marginTop: 42,
     transform: [{ rotate: '-8deg' }],
     width: 60,
+  },
+  checkMarkInactive: {
+    backgroundColor: '#3A3D38',
   },
   sectionHeader: {
     alignItems: 'center',

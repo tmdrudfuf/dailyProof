@@ -18,6 +18,7 @@ type GoalContextValue = {
   canAddGoal: boolean;
   addGoal: (goal: NewGoal) => boolean;
   deleteGoal: (goalId: string) => void;
+  incrementGoalCompletedDays: (goalId: string) => void;
 };
 
 const GoalContext = createContext<GoalContextValue | undefined>(undefined);
@@ -60,9 +61,33 @@ export function GoalProvider({ children }: GoalProviderProps) {
     );
   }, []);
 
+  const incrementGoalCompletedDays = useCallback((goalId: string) => {
+    setGoals((currentGoals) =>
+      currentGoals.map((goal) =>
+        goal.id === goalId
+          ? { ...goal, completedDays: goal.completedDays + 1 }
+          : goal,
+      ),
+    );
+  }, []);
+
   const value = useMemo(
-    () => ({ goals, activeGoals, canAddGoal, addGoal, deleteGoal }),
-    [goals, activeGoals, canAddGoal, addGoal, deleteGoal],
+    () => ({
+      goals,
+      activeGoals,
+      canAddGoal,
+      addGoal,
+      deleteGoal,
+      incrementGoalCompletedDays,
+    }),
+    [
+      goals,
+      activeGoals,
+      canAddGoal,
+      addGoal,
+      deleteGoal,
+      incrementGoalCompletedDays,
+    ],
   );
 
   return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;

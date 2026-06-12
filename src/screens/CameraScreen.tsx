@@ -1,250 +1,244 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useCheckIns } from '../context/CheckInContext';
+import { useGoals } from '../context/GoalContext';
 import { colors, radii } from '../theme';
+import { CameraStackParamList } from '../types/navigation';
 
-export function CameraScreen() {
+type CameraScreenProps = NativeStackScreenProps<
+  CameraStackParamList,
+  'CameraGoals'
+>;
+
+export function CameraScreen({ navigation }: CameraScreenProps) {
+  const { activeGoals } = useGoals();
+  const { hasCheckedInToday } = useCheckIns();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.topBar}>
-        <Pressable accessibilityLabel="Close camera" style={styles.topButton}>
-          <Ionicons color={colors.surface} name="close" size={24} />
-        </Pressable>
-        <Text style={styles.title}>New proof</Text>
-        <Pressable accessibilityLabel="Camera settings" style={styles.topButton}>
-          <Ionicons color={colors.surface} name="flash-outline" size={21} />
-        </Pressable>
-      </View>
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <FlatList
+        contentContainerStyle={styles.content}
+        data={activeGoals}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        keyExtractor={(goal) => goal.id}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons color={colors.muted} name="flag-outline" size={32} />
+            <Text style={styles.emptyTitle}>No active goals</Text>
+            <Text style={styles.emptyText}>
+              Create an active goal in Profile before checking in.
+            </Text>
+          </View>
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.eyebrow}>NEW CHECK-IN</Text>
+            <Text style={styles.title}>What are you{'\n'}proving today?</Text>
+            <Text style={styles.subtitle}>
+              Select one active goal before adding your proof.
+            </Text>
+            <Text style={styles.sectionLabel}>ACTIVE GOALS</Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const provedToday = hasCheckedInToday(item.id);
 
-      <View style={styles.goalPill}>
-        <View style={styles.goalIcon}>
-          <Ionicons color={colors.ink} name="walk-outline" size={17} />
-        </View>
-        <View style={styles.goalCopy}>
-          <Text style={styles.goalLabel}>PROVING TODAY</Text>
-          <Text style={styles.goalTitle}>Morning movement</Text>
-        </View>
-        <Ionicons color="#A6AAA2" name="chevron-down" size={18} />
-      </View>
-
-      <View style={styles.viewfinder}>
-        <View style={[styles.corner, styles.topLeft]} />
-        <View style={[styles.corner, styles.topRight]} />
-        <View style={[styles.corner, styles.bottomLeft]} />
-        <View style={[styles.corner, styles.bottomRight]} />
-        <View style={styles.cameraHint}>
-          <Ionicons color="#8B8F87" name="image-outline" size={40} />
-          <Text style={styles.cameraHintTitle}>Show the work</Text>
-          <Text style={styles.cameraHintText}>
-            Your camera preview will appear here.
-          </Text>
-        </View>
-        <View style={styles.timestamp}>
-          <View style={styles.liveDot} />
-          <Text style={styles.timestampText}>JUN 10 · 7:42 AM</Text>
-        </View>
-      </View>
-
-      <View style={styles.controls}>
-        <Pressable accessibilityLabel="Open photo library" style={styles.sideControl}>
-          <Ionicons color={colors.surface} name="images-outline" size={23} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Take proof photo"
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.captureButton,
-            pressed && styles.captureButtonPressed,
-          ]}
-        >
-          <View style={styles.captureInner} />
-        </Pressable>
-        <Pressable accessibilityLabel="Flip camera" style={styles.sideControl}>
-          <Ionicons color={colors.surface} name="camera-reverse-outline" size={24} />
-        </Pressable>
-      </View>
-
-      <Text style={styles.helper}>Tap once. Keep it honest.</Text>
+          return (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('CheckIn', { goalId: item.id })}
+              style={({ pressed }) => [
+                styles.goalCard,
+                provedToday && styles.goalCardProved,
+                pressed && styles.goalCardPressed,
+              ]}
+            >
+              <View style={[styles.emoji, provedToday && styles.emojiProved]}>
+                <Text style={styles.emojiText}>{item.categoryEmoji}</Text>
+              </View>
+              <View style={styles.goalCopy}>
+                <Text style={styles.category}>{item.category.toUpperCase()}</Text>
+                <Text style={styles.goalTitle}>{item.title}</Text>
+                {provedToday ? (
+                  <View style={styles.provedStatus}>
+                    <Ionicons
+                      color={colors.accentDark}
+                      name="checkmark-circle"
+                      size={15}
+                    />
+                    <Text style={styles.provedStatusText}>Proved today</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.goalProgress}>
+                    {item.completedDays} of {item.successTarget} proof days
+                  </Text>
+                )}
+              </View>
+              <View style={[styles.arrow, provedToday && styles.arrowProved]}>
+                <Ionicons
+                  color={colors.ink}
+                  name={provedToday ? 'checkmark' : 'arrow-forward'}
+                  size={19}
+                />
+              </View>
+            </Pressable>
+          );
+        }}
+        showsVerticalScrollIndicator={false}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#111310',
+    backgroundColor: colors.background,
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
+    paddingBottom: 34,
     paddingHorizontal: 18,
   },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 16,
-    paddingTop: 8,
+  header: {
+    paddingBottom: 12,
+    paddingTop: 22,
   },
-  topButton: {
-    alignItems: 'center',
-    backgroundColor: '#292C27',
-    borderRadius: 21,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
+  eyebrow: {
+    color: colors.accentDark,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.3,
   },
   title: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '800',
+    color: colors.ink,
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: -1.5,
+    lineHeight: 37,
+    marginTop: 10,
   },
-  goalPill: {
+  subtitle: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 10,
+  },
+  sectionLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginLeft: 4,
+    marginTop: 30,
+  },
+  goalCard: {
     alignItems: 'center',
-    backgroundColor: '#292C27',
-    borderRadius: radii.medium,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.large,
+    borderWidth: 1,
     flexDirection: 'row',
-    marginBottom: 14,
-    padding: 11,
+    minHeight: 96,
+    padding: 14,
   },
-  goalIcon: {
+  goalCardPressed: {
+    opacity: 0.65,
+    transform: [{ scale: 0.99 }],
+  },
+  goalCardProved: {
+    backgroundColor: '#F8FDEB',
+    borderColor: colors.accentDark,
+  },
+  emoji: {
     alignItems: 'center',
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    height: 38,
+    backgroundColor: colors.softGreen,
+    borderRadius: 18,
+    height: 58,
     justifyContent: 'center',
-    width: 38,
+    width: 58,
+  },
+  emojiText: {
+    fontSize: 27,
+  },
+  emojiProved: {
+    backgroundColor: colors.accent,
   },
   goalCopy: {
     flex: 1,
-    marginLeft: 11,
+    marginLeft: 13,
   },
-  goalLabel: {
-    color: '#8F938B',
-    fontSize: 9,
-    fontWeight: '800',
+  category: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '900',
     letterSpacing: 1,
   },
   goalTitle: {
-    color: colors.surface,
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 2,
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 3,
   },
-  viewfinder: {
-    alignItems: 'center',
-    backgroundColor: '#20231E',
-    borderRadius: radii.large,
-    flex: 1,
-    justifyContent: 'center',
-    maxHeight: 500,
-    minHeight: 330,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  cameraHint: {
-    alignItems: 'center',
-  },
-  cameraHintTitle: {
-    color: '#B8BCB3',
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
-  },
-  cameraHintText: {
-    color: '#777B74',
-    fontSize: 12,
+  goalProgress: {
+    color: colors.muted,
+    fontSize: 11,
     marginTop: 5,
   },
-  corner: {
-    borderColor: colors.accent,
-    height: 30,
-    position: 'absolute',
-    width: 30,
-  },
-  topLeft: {
-    borderLeftWidth: 2,
-    borderTopWidth: 2,
-    left: 20,
-    top: 20,
-  },
-  topRight: {
-    borderRightWidth: 2,
-    borderTopWidth: 2,
-    right: 20,
-    top: 20,
-  },
-  bottomLeft: {
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    bottom: 20,
-    left: 20,
-  },
-  bottomRight: {
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    bottom: 20,
-    right: 20,
-  },
-  timestamp: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(17, 19, 16, 0.8)',
-    borderRadius: radii.pill,
-    bottom: 18,
-    flexDirection: 'row',
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    position: 'absolute',
-  },
-  liveDot: {
-    backgroundColor: colors.accent,
-    borderRadius: 4,
-    height: 7,
-    width: 7,
-  },
-  timestampText: {
-    color: colors.surface,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  controls: {
+  provedStatus: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingTop: 22,
+    gap: 4,
+    marginTop: 5,
   },
-  sideControl: {
-    alignItems: 'center',
-    backgroundColor: '#292C27',
-    borderRadius: 23,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-  },
-  captureButton: {
-    alignItems: 'center',
-    borderColor: colors.surface,
-    borderRadius: 39,
-    borderWidth: 3,
-    height: 78,
-    justifyContent: 'center',
-    width: 78,
-  },
-  captureButtonPressed: {
-    opacity: 0.65,
-    transform: [{ scale: 0.96 }],
-  },
-  captureInner: {
-    backgroundColor: colors.accent,
-    borderRadius: 31,
-    height: 62,
-    width: 62,
-  },
-  helper: {
-    color: '#777B74',
+  provedStatusText: {
+    color: colors.accentDark,
     fontSize: 11,
-    paddingBottom: 8,
-    paddingTop: 10,
+    fontWeight: '900',
+  },
+  arrow: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  arrowProved: {
+    backgroundColor: colors.accent,
+  },
+  separator: {
+    height: 11,
+  },
+  emptyState: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.large,
+    borderWidth: 1,
+    marginTop: 8,
+    padding: 32,
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 12,
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
     textAlign: 'center',
   },
 });

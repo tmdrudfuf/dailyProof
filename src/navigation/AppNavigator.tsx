@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
 
-import { CameraScreen } from '../screens/CameraScreen';
 import { FeedScreen } from '../screens/FeedScreen';
 import { colors } from '../theme';
 import { RootTabParamList } from '../types/navigation';
+import { CameraNavigator } from './CameraNavigator';
 import { ProfileNavigator } from './ProfileNavigator';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -53,7 +53,7 @@ export function AppNavigator() {
       })}
     >
       <Tab.Screen component={FeedScreen} name="Feed" />
-      <Tab.Screen component={CameraScreen} name="Camera" />
+      <Tab.Screen component={CameraNavigator} name="Camera" />
       <Tab.Screen component={ProfileNavigator} name="Profile" />
     </Tab.Navigator>
   );

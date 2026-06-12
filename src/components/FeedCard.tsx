@@ -48,29 +48,56 @@ export function FeedCard({ post }: FeedCardProps) {
         </Pressable>
       </View>
 
-      <View style={[styles.proofVisual, { backgroundColor: visual.background }]}>
-        <Text style={styles.proofMark}>DAILY{'\n'}PROOF</Text>
-        <Ionicons color={colors.ink} name={visual.icon} size={72} />
-        <View style={styles.visualLabel}>
-          <Text style={styles.visualLabelText}>{visual.label}</Text>
+      {post.isCheckIn ? (
+        <View style={styles.mockPhoto}>
+          <View style={styles.mockSun} />
+          <View style={styles.mockGround} />
+          <Text style={styles.mockPhotoEmoji}>
+            {post.categoryEmoji ?? '✨'}
+          </Text>
+          <View style={styles.mockPhotoBadge}>
+            <Text style={styles.mockPhotoBadgeText}>MOCK PHOTO</Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        <View style={[styles.proofVisual, { backgroundColor: visual.background }]}>
+          <Text style={styles.proofMark}>DAILY{'\n'}PROOF</Text>
+          <Ionicons color={colors.ink} name={visual.icon} size={72} />
+          <View style={styles.visualLabel}>
+            <Text style={styles.visualLabelText}>{visual.label}</Text>
+          </View>
+        </View>
+      )}
 
-      <View style={styles.actions}>
-        <View style={styles.reactions}>
-          <Pressable accessibilityLabel="Cheer this proof" style={styles.actionButton}>
-            <Ionicons color={colors.ink} name="heart-outline" size={22} />
-          </Pressable>
-          <Text style={styles.reactionCount}>{post.reactions}</Text>
-          <Pressable accessibilityLabel="Comment on this proof" style={styles.actionButton}>
-            <Ionicons color={colors.ink} name="chatbubble-outline" size={20} />
-          </Pressable>
+      {post.isCheckIn ? (
+        <View style={styles.checkInActions}>
+          <View style={styles.emojiReactions}>
+            <Text style={styles.reactionEmoji}>🔥</Text>
+            <Text style={styles.reactionEmoji}>💪</Text>
+            <Text style={styles.reactionEmoji}>👏</Text>
+          </View>
+          <View style={styles.verifiedBadge}>
+            <Ionicons color={colors.ink} name="checkmark-circle" size={16} />
+            <Text style={styles.verifiedText}>VERIFIED</Text>
+          </View>
         </View>
-        <View style={styles.streak}>
-          <Ionicons color={colors.ink} name="flame-outline" size={16} />
-          <Text style={styles.streakText}>{post.streak} day streak</Text>
+      ) : (
+        <View style={styles.actions}>
+          <View style={styles.reactions}>
+            <Pressable accessibilityLabel="Cheer this proof" style={styles.actionButton}>
+              <Ionicons color={colors.ink} name="heart-outline" size={22} />
+            </Pressable>
+            <Text style={styles.reactionCount}>{post.reactions}</Text>
+            <Pressable accessibilityLabel="Comment on this proof" style={styles.actionButton}>
+              <Ionicons color={colors.ink} name="chatbubble-outline" size={20} />
+            </Pressable>
+          </View>
+          <View style={styles.streak}>
+            <Ionicons color={colors.ink} name="flame-outline" size={16} />
+            <Text style={styles.streakText}>{post.streak} day streak</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <Text style={styles.description}>
         <Text style={styles.friendName}>{post.friendName} </Text>
@@ -113,6 +140,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'relative',
+  },
+  mockPhoto: {
+    alignItems: 'center',
+    aspectRatio: 1.05,
+    backgroundColor: colors.softBlue,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mockSun: {
+    backgroundColor: '#FFE173',
+    borderRadius: 45,
+    height: 90,
+    position: 'absolute',
+    right: 34,
+    top: 36,
+    width: 90,
+  },
+  mockGround: {
+    backgroundColor: colors.softGreen,
+    bottom: -60,
+    height: '48%',
+    position: 'absolute',
+    transform: [{ rotate: '-7deg' }],
+    width: '120%',
+  },
+  mockPhotoEmoji: {
+    fontSize: 76,
+    zIndex: 1,
+  },
+  mockPhotoBadge: {
+    backgroundColor: colors.ink,
+    borderRadius: radii.pill,
+    bottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    position: 'absolute',
+    right: 16,
+  },
+  mockPhotoBadgeText: {
+    color: colors.surface,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.9,
   },
   proofMark: {
     color: colors.ink,
@@ -173,6 +244,35 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 11,
     fontWeight: '800',
+  },
+  checkInActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  emojiReactions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  reactionEmoji: {
+    fontSize: 20,
+  },
+  verifiedBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  verifiedText: {
+    color: colors.ink,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.7,
   },
   description: {
     color: colors.ink,
