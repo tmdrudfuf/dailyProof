@@ -10,9 +10,11 @@ import {
   reactionEmojis,
   ReactionEmoji,
 } from '../types/friend';
+import { ActivityDetailModal } from './ActivityDetailModal';
 import { Avatar } from './Avatar';
 
 type FeedCardProps = {
+  activityDisplayMode?: 'inline' | 'modal';
   post: FeedPost;
   friendComments?: FriendComment[];
   friendReactions?: FriendReaction[];
@@ -42,6 +44,7 @@ const visualConfig = {
 };
 
 export function FeedCard({
+  activityDisplayMode = 'modal',
   post,
   friendComments = [],
   friendReactions = [],
@@ -51,6 +54,9 @@ export function FeedCard({
   const visual = visualConfig[post.visual];
   const [showAllComments, setShowAllComments] = useState(false);
   const [showAllReactions, setShowAllReactions] = useState(false);
+  const [activityModal, setActivityModal] = useState<
+    'comments' | 'reactions' | null
+  >(null);
   const visibleComments = showAllComments
     ? friendComments
     : friendComments.slice(0, 1);
@@ -158,53 +164,69 @@ export function FeedCard({
       ) : null}
 
       {visibleReactions.length > 0 ? (
-        <>
-          <Pressable
-            accessibilityLabel={
-              showAllReactions
-                ? 'Hide everyone who reacted'
-                : 'Show everyone who reacted'
-            }
-            accessibilityRole="button"
-            onPress={() => setShowAllReactions((current) => !current)}
-            style={styles.friendReactionSummary}
-          >
-          <View style={styles.reactorAvatars}>
-            {visibleReactions.slice(0, 3).map((item, index) => (
-              <View
-                key={`${item.friendId}-${item.reaction}`}
-                style={[
-                  styles.reactorAvatar,
-                  index > 0 && styles.reactorAvatarOverlap,
-                ]}
-              >
-                <Text style={styles.reactorInitial}>
-                  {item.displayName.slice(0, 1)}
-                </Text>
+        <View style={styles.reactionsSection}>
+          {!showAllReactions ? (
+            <Pressable
+              accessibilityLabel={`View all ${visibleReactions.length} reactions`}
+              accessibilityRole="button"
+              onPress={() => {
+                if (activityDisplayMode === 'modal') {
+                  setActivityModal('reactions');
+                } else {
+                  setShowAllReactions(true);
+                }
+              }}
+              style={styles.friendReactionSummary}
+            >
+              <View style={styles.reactorAvatars}>
+                {visibleReactions.slice(0, 3).map((item, index) => (
+                  <View
+                    key={`${item.friendId}-${item.reaction}`}
+                    style={[
+                      styles.reactorAvatar,
+                      index > 0 && styles.reactorAvatarOverlap,
+                    ]}
+                  >
+                    <Text style={styles.reactorInitial}>
+                      {item.displayName.slice(0, 1)}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-          <Text style={styles.friendReactionText}>
-            {visibleReactions
-              .slice(0, 2)
-              .map((item) => `${item.displayName} ${item.reaction}`)
-              .join(', ')}
-            {visibleReactions.length > 2
-              ? ` and ${visibleReactions.length - 2} more reacted`
-              : ' reacted'}
-          </Text>
-            <Ionicons
-              color={colors.muted}
-              name={showAllReactions ? 'chevron-up' : 'chevron-down'}
-              size={16}
-            />
-          </Pressable>
-
-          {showAllReactions ? (
-            <View style={styles.reactionDetails}>
-              <Text style={styles.reactionDetailsTitle}>
-                ALL REACTIONS
+              <Text style={styles.friendReactionText}>
+                {visibleReactions
+                  .slice(0, 2)
+                  .map((item) => `${item.displayName} ${item.reaction}`)
+                  .join(', ')}
+                {visibleReactions.length > 2
+                  ? ` and ${visibleReactions.length - 2} more reacted`
+                  : ' reacted'}
               </Text>
+              <Ionicons
+                color={colors.muted}
+                name="chevron-down"
+                size={14}
+              />
+            </Pressable>
+          ) : null}
+
+          {activityDisplayMode === 'inline' && showAllReactions ? (
+            <View style={styles.reactionDetails}>
+              <Pressable
+                accessibilityLabel="Hide all reactions"
+                accessibilityRole="button"
+                onPress={() => setShowAllReactions(false)}
+                style={styles.expandedHeader}
+              >
+                <Text style={styles.reactionDetailsTitle}>
+                  ALL REACTIONS
+                </Text>
+                <Ionicons
+                  color={colors.muted}
+                  name="chevron-up"
+                  size={14}
+                />
+              </Pressable>
               {visibleReactions.map((item) => (
                 <View
                   key={`${item.friendId}-${item.reaction}-detail`}
@@ -225,7 +247,7 @@ export function FeedCard({
               ))}
             </View>
           ) : null}
-        </>
+        </View>
       ) : null}
 
       <Text style={styles.description}>
@@ -235,37 +257,86 @@ export function FeedCard({
 
       {friendComments.length > 0 ? (
         <View style={styles.comments}>
-          {friendComments.length > 1 ? (
+          {!showAllComments ? (
             <Pressable
+              accessibilityLabel={`View all ${friendComments.length} comments`}
               accessibilityRole="button"
-              onPress={() => setShowAllComments((current) => !current)}
+              onPress={() => {
+                if (activityDisplayMode === 'modal') {
+                  setActivityModal('comments');
+                } else {
+                  setShowAllComments(true);
+                }
+              }}
+              style={styles.commentSummary}
             >
-              <Text style={styles.viewComments}>
-                {showAllComments
-                  ? 'Hide comments'
-                  : `View all ${friendComments.length} comments`}
+              <View style={styles.commentSummaryAvatar}>
+                <Text style={styles.commentInitial}>
+                  {friendComments[0].displayName.slice(0, 1)}
+                </Text>
+              </View>
+              <View style={styles.commentSummaryCopy}>
+                <Text style={styles.commentSummaryName}>
+                  {friendComments[0].displayName}
+                </Text>
+                <Text numberOfLines={1} style={styles.commentSummaryMessage}>
+                  {friendComments[0].message}
+                </Text>
+              </View>
+              <Text style={styles.commentCount}>
+                {friendComments.length}
               </Text>
+              <Ionicons
+                color={colors.muted}
+                name="chevron-down"
+                size={14}
+              />
+            </Pressable>
+          ) : activityDisplayMode === 'inline' ? (
+            <Pressable
+              accessibilityLabel="Hide all comments"
+              accessibilityRole="button"
+              onPress={() => setShowAllComments(false)}
+              style={styles.expandedHeader}
+            >
+              <Text style={styles.reactionDetailsTitle}>ALL COMMENTS</Text>
+              <Ionicons
+                color={colors.muted}
+                name="chevron-up"
+                size={14}
+              />
             </Pressable>
           ) : null}
 
-          {visibleComments.map((comment) => (
-            <View key={comment.id} style={styles.commentRow}>
-              <View style={styles.commentAvatar}>
-                <Text style={styles.commentInitial}>
-                  {comment.displayName.slice(0, 1)}
-                </Text>
-              </View>
-              <View style={styles.commentBubble}>
-                <Text style={styles.commentText}>
-                  <Text style={styles.commentName}>
-                    {comment.displayName}{' '}
-                  </Text>
-                  {comment.message}
-                </Text>
-              </View>
-            </View>
-          ))}
+          {activityDisplayMode === 'inline' && showAllComments
+            ? visibleComments.map((comment) => (
+                <View key={comment.id} style={styles.commentRow}>
+                  <View style={styles.commentAvatar}>
+                    <Text style={styles.commentInitial}>
+                      {comment.displayName.slice(0, 1)}
+                    </Text>
+                  </View>
+                  <View style={styles.commentBubble}>
+                    <Text style={styles.commentText}>
+                      <Text style={styles.commentName}>
+                        {comment.displayName}{' '}
+                      </Text>
+                      {comment.message}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            : null}
         </View>
+      ) : null}
+
+      {activityDisplayMode === 'modal' ? (
+        <ActivityDetailModal
+          comments={friendComments}
+          mode={activityModal}
+          onClose={() => setActivityModal(null)}
+          reactions={visibleReactions}
+        />
       ) : null}
     </View>
   );
@@ -427,10 +498,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderRadius: radii.medium,
     flexDirection: 'row',
-    marginHorizontal: 14,
-    marginTop: 12,
     paddingHorizontal: 11,
     paddingVertical: 9,
+  },
+  reactionsSection: {
+    marginHorizontal: 14,
+    marginTop: 12,
   },
   activityVisibility: {
     alignItems: 'center',
@@ -476,7 +549,6 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.medium,
     borderWidth: 1,
-    marginHorizontal: 14,
     marginTop: 8,
     overflow: 'hidden',
   },
@@ -485,8 +557,13 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  expandedHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 38,
     paddingHorizontal: 12,
-    paddingTop: 11,
   },
   reactionDetailRow: {
     alignItems: 'center',
@@ -527,11 +604,41 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     paddingTop: 11,
   },
-  viewComments: {
+  commentSummary: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: radii.medium,
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  commentSummaryAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.softBlue,
+    borderRadius: 13,
+    height: 26,
+    justifyContent: 'center',
+    marginRight: 9,
+    width: 26,
+  },
+  commentSummaryCopy: {
+    flex: 1,
+  },
+  commentSummaryName: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  commentSummaryMessage: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 10,
+    marginTop: 2,
+  },
+  commentCount: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '900',
+    marginHorizontal: 7,
   },
   commentRow: {
     alignItems: 'flex-start',
