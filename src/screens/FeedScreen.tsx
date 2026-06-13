@@ -8,9 +8,8 @@ import { useCheckIns } from '../context/CheckInContext';
 import { useFriends } from '../context/FriendContext';
 import { useGoals } from '../context/GoalContext';
 import {
-  getMockCommentsForPost,
-  getMockFriendCheckIns,
-  getMockReactionsForPost,
+  getCommentsForPost,
+  getReactionsForPost,
 } from '../services/friendService';
 import { colors, radii } from '../theme';
 
@@ -32,13 +31,13 @@ function getCheckInTime(createdAt?: string) {
 
 export function FeedScreen() {
   const { checkInFeedPosts, hasCheckedInToday } = useCheckIns();
-  const { reactions, toggleReaction } = useFriends();
+  const { friendFeedItems, reactions, toggleReaction } = useFriends();
   const { activeGoals } = useGoals();
   const restoredCheckInPosts = checkInFeedPosts.map((post) => ({
     ...post,
     timeAgo: getCheckInTime(post.createdAt),
   }));
-  const friendCheckInPosts = getMockFriendCheckIns().map((post) => ({
+  const friendCheckInPosts = friendFeedItems.map((post) => ({
     ...post,
     timeAgo: getCheckInTime(post.createdAt),
   }));
@@ -138,11 +137,11 @@ export function FeedScreen() {
         }
         renderItem={({ item }) => (
           <FeedCard
-            friendComments={getMockCommentsForPost(
+            friendComments={getCommentsForPost(
               item.id,
               item.friendId
             )}
-            friendReactions={getMockReactionsForPost(
+            friendReactions={getReactionsForPost(
               item.id,
               item.friendId
             )}

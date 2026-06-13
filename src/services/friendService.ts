@@ -5,7 +5,7 @@ import {
   FriendReaction,
 } from '../types/friend';
 
-export const mockFriends: Friend[] = [
+const mockFriends: Friend[] = [
   {
     id: 'friend-emma',
     displayName: 'Emma',
@@ -29,7 +29,7 @@ export const mockFriends: Friend[] = [
   },
 ];
 
-export const mockFriendRequests: Friend[] = [
+const mockFriendRequests: Friend[] = [
   {
     id: 'request-lina',
     displayName: 'Lina',
@@ -49,7 +49,16 @@ export const mockFriendRequests: Friend[] = [
 const minutesAgo = (minutes: number) =>
   new Date(Date.now() - minutes * 60 * 1000).toISOString();
 
-export const getMockFriendCheckIns = (): FeedPost[] => [
+export async function getFriends(): Promise<Friend[]> {
+  return mockFriends;
+}
+
+export async function getFriendRequests(): Promise<Friend[]> {
+  return mockFriendRequests;
+}
+
+export async function getFeedItems(): Promise<FeedPost[]> {
+  return [
   {
     id: 'friend-checkin-emma',
     friendId: 'friend-emma',
@@ -95,9 +104,10 @@ export const getMockFriendCheckIns = (): FeedPost[] => [
     isCheckIn: true,
     createdAt: minutesAgo(120),
   },
-];
+  ];
+}
 
-export const getMockReactionsForPost = (
+export const getReactionsForPost = (
   postId: string,
   ownerId?: string
 ): FriendReaction[] => {
@@ -147,7 +157,7 @@ export const getMockReactionsForPost = (
   ];
 };
 
-export const getMockCommentsForPost = (
+export const getCommentsForPost = (
   postId: string,
   ownerId?: string
 ): FriendComment[] => {

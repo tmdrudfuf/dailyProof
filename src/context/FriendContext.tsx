@@ -6,15 +6,18 @@ import {
   useMemo,
   useState,
 } from 'react';
+
 import {
-  mockFriendRequests,
-  mockFriends,
+  getFeedItems,
+  getFriendRequests,
+  getFriends,
 } from '../services/friendService';
 import {
-  readStoredJson,
-  storageKeys,
-  writeStoredJson,
-} from '../services/storage';
+  addReaction,
+  getReactions,
+  removeReaction,
+} from '../services/reactionService';
+import { FeedPost } from '../types/feed';
 import {
   Friend,
   FriendReactions,
@@ -24,6 +27,7 @@ import {
 type FriendContextValue = {
   friends: Friend[];
   friendRequests: Friend[];
+  friendFeedItems: FeedPost[];
   reactions: FriendReactions;
   toggleReaction: (postId: string, reaction: ReactionEmoji) => void;
 };
@@ -31,39 +35,58 @@ type FriendContextValue = {
 const FriendContext = createContext<FriendContextValue | undefined>(undefined);
 
 export function FriendProvider({ children }: PropsWithChildren) {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friendRequests, setFriendRequests] = useState<Friend[]>([]);
+  const [friendFeedItems, setFriendFeedItems] = useState<FeedPost[]>([]);
   const [reactions, setReactions] = useState<FriendReactions>({});
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    async function restoreReactions() {
-      const savedReactions = await readStoredJson<FriendReactions>(
-        storageKeys.friendReactions,
-        {}
-      );
+    let isMounted = true;
 
-      setReactions(savedReactions);
+    async function restoreFriendState() {
+      const [
+        savedFriends,
+        savedFriendRequests,
+        savedFeedItems,
+        savedReactions,
+      ] = await Promise.all([
+        getFriends(),
+        getFriendRequests(),
+        getFeedItems(),
+        getReactions(),
+      ]);
 
-      setIsHydrated(true);
+      if (isMounted) {
+        setFriends(savedFriends);
+        setFriendRequests(savedFriendRequests);
+        setFriendFeedItems(savedFeedItems);
+        setReactions(savedReactions);
+        setIsHydrated(true);
+      }
     }
 
-    void restoreReactions();
+    void restoreFriendState();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  useEffect(() => {
-    if (isHydrated) {
-      void writeStoredJson(storageKeys.friendReactions, reactions);
-    }
-  }, [isHydrated, reactions]);
 
   const value = useMemo<FriendContextValue>(
     () => ({
-      friends: mockFriends,
-      friendRequests: mockFriendRequests,
+      friends,
+      friendRequests,
+      friendFeedItems,
       reactions,
       toggleReaction: (postId, reaction) => {
         setReactions((current) => {
           const postReactions = current[postId] ?? [];
           const isSelected = postReactions.includes(reaction);
+
+          void (isSelected
+            ? removeReaction(postId, reaction)
+            : addReaction(postId, reaction));
 
           return {
             ...current,
@@ -74,8 +97,12 @@ export function FriendProvider({ children }: PropsWithChildren) {
         });
       },
     }),
-    [reactions]
+    [friendFeedItems, friendRequests, friends, reactions]
   );
+
+  if (!isHydrated) {
+    return null;
+  }
 
   return (
     <FriendContext.Provider value={value}>{children}</FriendContext.Provider>

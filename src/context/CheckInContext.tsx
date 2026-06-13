@@ -8,18 +8,15 @@ import {
   useState,
 } from 'react';
 
-import { useGoals } from './GoalContext';
 import {
-  readStoredJson,
-  storageKeys,
-  writeStoredJson,
-} from '../services/storage';
-import { verifyCheckInPhoto } from '../services/verificationService';
+  createCheckIn,
+  getCheckIns,
+  getFeedItems,
+} from '../services/checkInService';
 import { CheckIn } from '../types/checkIn';
 import { FeedPost } from '../types/feed';
 import { Goal } from '../types/goal';
-
-const LOCAL_USER_ID = 'local-user';
+import { useGoals } from './GoalContext';
 
 type CheckInContextValue = {
   checkIns: CheckIn[];
@@ -29,21 +26,11 @@ type CheckInContextValue = {
 };
 
 const CheckInContext = createContext<CheckInContextValue | undefined>(
-  undefined,
+  undefined
 );
 
 type CheckInProviderProps = {
   children: ReactNode;
-};
-
-type StoredCheckInState = {
-  checkIns: CheckIn[];
-  checkInFeedPosts: FeedPost[];
-};
-
-const emptyCheckInState: StoredCheckInState = {
-  checkIns: [],
-  checkInFeedPosts: [],
 };
 
 function isSameCalendarDay(firstDate: string, secondDate: string) {
@@ -57,18 +44,6 @@ function isSameCalendarDay(firstDate: string, secondDate: string) {
   );
 }
 
-function getVisual(goal: Goal): FeedPost['visual'] {
-  if (goal.category === 'Exercise') {
-    return 'run';
-  }
-
-  if (goal.category === 'Reading') {
-    return 'read';
-  }
-
-  return 'build';
-}
-
 export function CheckInProvider({ children }: CheckInProviderProps) {
   const { incrementGoalCompletedDays } = useGoals();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
@@ -79,27 +54,14 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
     let isMounted = true;
 
     async function restoreCheckInState() {
-      const storedState = await readStoredJson<StoredCheckInState>(
-        storageKeys.checkInState,
-        emptyCheckInState,
-      );
+      const [storedCheckIns, storedFeedItems] = await Promise.all([
+        getCheckIns(),
+        getFeedItems(),
+      ]);
 
       if (isMounted) {
-        setCheckIns(
-          Array.isArray(storedState?.checkIns)
-            ? storedState.checkIns.map((checkIn) => ({
-                ...checkIn,
-                aiFeedback:
-                  checkIn.aiFeedback ??
-                  'Verification completed for this saved check-in.',
-              }))
-            : [],
-        );
-        setCheckInFeedPosts(
-          Array.isArray(storedState?.checkInFeedPosts)
-            ? storedState.checkInFeedPosts
-            : [],
-        );
+        setCheckIns(storedCheckIns);
+        setCheckInFeedPosts(storedFeedItems);
         setIsHydrated(true);
       }
     }
@@ -111,80 +73,38 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (isHydrated) {
-      void writeStoredJson<StoredCheckInState>(storageKeys.checkInState, {
-        checkIns,
-        checkInFeedPosts,
-      });
-    }
-  }, [checkIns, checkInFeedPosts, isHydrated]);
-
-
   const hasCheckedInToday = useCallback(
     (goalId: string) => {
       const now = new Date().toISOString();
       return checkIns.some(
         (checkIn) =>
           checkIn.goalId === goalId &&
-          isSameCalendarDay(checkIn.createdAt, now),
+          isSameCalendarDay(checkIn.createdAt, now)
       );
     },
-    [checkIns],
+    [checkIns]
   );
 
   const submitCheckIn = useCallback(
     async (goal: Goal, photoUrl: string) => {
-      const createdAt = new Date().toISOString();
-      const alreadyCountedToday = checkIns.some(
-        (checkIn) =>
-          checkIn.goalId === goal.id &&
-          isSameCalendarDay(checkIn.createdAt, createdAt),
-      );
-      const verification = await verifyCheckInPhoto(
-        photoUrl,
-        goal.category,
-        goal.title,
-      );
-      const id = `check-in-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const result = await createCheckIn(goal, photoUrl);
 
-      const checkIn: CheckIn = {
-        id,
-        goalId: goal.id,
-        userId: LOCAL_USER_ID,
-        photoUrl,
-        ...verification,
-        createdAt,
-      };
+      setCheckIns((currentCheckIns) => [
+        result.checkIn,
+        ...currentCheckIns,
+      ]);
+      setCheckInFeedPosts((currentPosts) => [
+        result.feedPost,
+        ...currentPosts,
+      ]);
 
-      const feedPost: FeedPost = {
-        id,
-        friendName: 'Ky',
-        initials: 'KY',
-        goal: goal.title,
-        proof: 'Checked in and kept today’s promise.',
-        timeAgo: 'Just now',
-        streak: alreadyCountedToday
-          ? goal.completedDays
-          : goal.completedDays + 1,
-        reactions: 0,
-        visual: getVisual(goal),
-        categoryEmoji: goal.categoryEmoji,
-        photoUrl,
-        isCheckIn: true,
-        createdAt,
-      };
-
-      setCheckIns((currentCheckIns) => [checkIn, ...currentCheckIns]);
-      setCheckInFeedPosts((currentPosts) => [feedPost, ...currentPosts]);
-
-      if (verification.aiResult === 'approved' && !alreadyCountedToday) {
-        incrementGoalCompletedDays(goal.id);
+      if (result.shouldIncrementGoal) {
+        await incrementGoalCompletedDays(goal.id);
       }
 
-      return checkIn;
+      return result.checkIn;
     },
-    [checkIns, incrementGoalCompletedDays],
+    [incrementGoalCompletedDays]
   );
 
   const value = useMemo(
@@ -194,7 +114,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       hasCheckedInToday,
       submitCheckIn,
     }),
-    [checkIns, checkInFeedPosts, hasCheckedInToday, submitCheckIn],
+    [checkIns, checkInFeedPosts, hasCheckedInToday, submitCheckIn]
   );
 
   if (!isHydrated) {

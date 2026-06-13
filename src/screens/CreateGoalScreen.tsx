@@ -167,7 +167,7 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
     setStep((currentStepIndex) => currentStepIndex - 1);
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     const validationError = validateCurrentStep();
     if (validationError) {
       setError(validationError);
@@ -195,7 +195,7 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
       visibility,
     };
 
-    if (addGoal(goal)) {
+    if (await addGoal(goal)) {
       navigation.goBack();
     } else {
       setError('You can have up to 3 active goals.');

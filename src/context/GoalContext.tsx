@@ -5,26 +5,26 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
-import { mockGoals } from '../services/mockGoals';
 import {
-  readStoredJson,
-  storageKeys,
-  writeStoredJson,
-} from '../services/storage';
+  createGoal,
+  deleteGoal as deleteStoredGoal,
+  getGoals,
+  MAX_ACTIVE_GOALS,
+  updateGoal,
+} from '../services/goalService';
 import { Goal, NewGoal } from '../types/goal';
-
-const MAX_ACTIVE_GOALS = 3;
 
 type GoalContextValue = {
   goals: Goal[];
   activeGoals: Goal[];
   canAddGoal: boolean;
-  addGoal: (goal: NewGoal) => boolean;
-  deleteGoal: (goalId: string) => void;
-  incrementGoalCompletedDays: (goalId: string) => void;
+  addGoal: (goal: NewGoal) => Promise<boolean>;
+  deleteGoal: (goalId: string) => Promise<void>;
+  incrementGoalCompletedDays: (goalId: string) => Promise<void>;
 };
 
 const GoalContext = createContext<GoalContextValue | undefined>(undefined);
@@ -34,20 +34,18 @@ type GoalProviderProps = {
 };
 
 export function GoalProvider({ children }: GoalProviderProps) {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const isCreatingGoal = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
 
     async function restoreGoals() {
-      const storedGoals = await readStoredJson<Goal[]>(
-        storageKeys.goals,
-        mockGoals,
-      );
+      const storedGoals = await getGoals();
 
       if (isMounted) {
-        setGoals(Array.isArray(storedGoals) ? storedGoals : mockGoals);
+        setGoals(storedGoals);
         setIsHydrated(true);
       }
     }
@@ -59,53 +57,66 @@ export function GoalProvider({ children }: GoalProviderProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (isHydrated) {
-      void writeStoredJson(storageKeys.goals, goals);
-    }
-  }, [goals, isHydrated]);
-
   const activeGoals = useMemo(
     () => goals.filter((goal) => goal.isActive),
-    [goals],
+    [goals]
   );
   const canAddGoal = activeGoals.length < MAX_ACTIVE_GOALS;
 
   const addGoal = useCallback(
-    (newGoal: NewGoal) => {
+    async (newGoal: NewGoal) => {
       if (!canAddGoal) {
         return false;
       }
 
-      const goal: Goal = {
-        ...newGoal,
-        id: `goal-${Date.now()}`,
-        completedDays: 0,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
+      if (isCreatingGoal.current) {
+        return false;
+      }
 
-      setGoals((currentGoals) => [goal, ...currentGoals]);
-      return true;
+      isCreatingGoal.current = true;
+
+      try {
+        const goal = await createGoal(newGoal);
+        setGoals((currentGoals) => [goal, ...currentGoals]);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        isCreatingGoal.current = false;
+      }
     },
-    [canAddGoal],
+    [canAddGoal]
   );
 
-  const deleteGoal = useCallback((goalId: string) => {
+  const deleteGoal = useCallback(async (goalId: string) => {
+    await deleteStoredGoal(goalId);
     setGoals((currentGoals) =>
-      currentGoals.filter((goal) => goal.id !== goalId),
+      currentGoals.filter((goal) => goal.id !== goalId)
     );
   }, []);
 
-  const incrementGoalCompletedDays = useCallback((goalId: string) => {
-    setGoals((currentGoals) =>
-      currentGoals.map((goal) =>
-        goal.id === goalId
-          ? { ...goal, completedDays: goal.completedDays + 1 }
-          : goal,
-      ),
-    );
-  }, []);
+  const incrementGoalCompletedDays = useCallback(
+    async (goalId: string) => {
+      const goal = goals.find((item) => item.id === goalId);
+
+      if (!goal) {
+        return;
+      }
+
+      const updatedGoal = await updateGoal(goalId, {
+        completedDays: goal.completedDays + 1,
+      });
+
+      if (updatedGoal) {
+        setGoals((currentGoals) =>
+          currentGoals.map((item) =>
+            item.id === goalId ? updatedGoal : item
+          )
+        );
+      }
+    },
+    [goals]
+  );
 
   const value = useMemo(
     () => ({
@@ -123,7 +134,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
       addGoal,
       deleteGoal,
       incrementGoalCompletedDays,
-    ],
+    ]
   );
 
   if (!isHydrated) {
