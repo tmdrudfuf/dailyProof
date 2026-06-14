@@ -9,7 +9,7 @@ import {
 import { User } from 'firebase/auth';
 
 import {
-  getUserProfile,
+  loadUserProfile,
   signIn,
   signOut,
   signUp,
@@ -48,9 +48,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setFirebaseUser(user);
 
       if (user) {
-        const userProfile = await getUserProfile(user);
-        if (isMounted) {
-          setProfile(userProfile);
+        try {
+          const userProfile = await loadUserProfile(user);
+          if (isMounted) {
+            setProfile(userProfile);
+          }
+        } catch {
+          if (isMounted) {
+            setProfile(null);
+          }
         }
       } else {
         setProfile(null);

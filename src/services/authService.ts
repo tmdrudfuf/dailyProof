@@ -1,21 +1,22 @@
+import { FirebaseError } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
-  User,
+  User as FirebaseUser,
 } from 'firebase/auth';
-import { FirebaseError } from 'firebase/app';
 
-import { UserProfile } from '../types/user';
+import { User } from '../types/user';
 import { auth, isFirebaseConfigured } from './firebase';
-import { readStoredJson, storageKeys, writeStoredJson } from './storage';
-
-type StoredProfiles = Record<string, UserProfile>;
+import {
+  createUserProfile,
+  getUserProfile,
+} from './userService';
 
 type PendingSignupProfile = Pick<
-  UserProfile,
+  User,
   'displayName' | 'username' | 'createdAt'
 >;
 
@@ -40,55 +41,39 @@ function generateUsername(displayName: string) {
   return `@${base}_${suffix}`;
 }
 
-async function saveUserProfile(profile: UserProfile) {
-  const profiles = await readStoredJson<StoredProfiles>(
-    storageKeys.userProfiles,
-    {}
-  );
+export async function loadUserProfile(
+  firebaseUser: FirebaseUser
+): Promise<User> {
+  const existingProfile = await getUserProfile(firebaseUser.uid);
 
-  await writeStoredJson(storageKeys.userProfiles, {
-    ...profiles,
-    [profile.uid]: profile,
-  });
-}
-
-export async function getUserProfile(
-  user: User
-): Promise<UserProfile> {
-  const profiles = await readStoredJson<StoredProfiles>(
-    storageKeys.userProfiles,
-    {}
-  );
-  const storedProfile = profiles[user.uid];
-
-  if (storedProfile) {
-    return storedProfile;
+  if (existingProfile) {
+    return existingProfile;
   }
 
   const displayName =
     pendingSignupProfile?.displayName ??
-    (user.displayName?.trim() ||
-      user.email?.split('@')[0] ||
+    (firebaseUser.displayName?.trim() ||
+      firebaseUser.email?.split('@')[0] ||
       'DailyProof User');
-  const profile: UserProfile = {
-    uid: user.uid,
+  const profile: User = {
+    uid: firebaseUser.uid,
     displayName,
-    email: user.email ?? '',
+    email: firebaseUser.email ?? '',
     username:
       pendingSignupProfile?.username ?? generateUsername(displayName),
+    currentStreak: 0,
     createdAt:
       pendingSignupProfile?.createdAt ?? new Date().toISOString(),
   };
 
-  await saveUserProfile(profile);
-  return profile;
+  return createUserProfile(profile);
 }
 
 export async function signUp(
   displayName: string,
   email: string,
   password: string
-): Promise<UserProfile> {
+): Promise<User> {
   assertFirebaseConfigured();
   pendingSignupProfile = {
     displayName: displayName.trim(),
@@ -102,23 +87,23 @@ export async function signUp(
       email.trim(),
       password
     );
-
-    const profile: UserProfile = {
+    const profile: User = {
       uid: credential.user.uid,
       displayName: pendingSignupProfile.displayName,
       email: credential.user.email ?? email.trim(),
       username: pendingSignupProfile.username,
+      currentStreak: 0,
       createdAt: pendingSignupProfile.createdAt,
     };
 
-    await saveUserProfile(profile);
+    await createUserProfile(profile);
 
     try {
       await updateProfile(credential.user, {
         displayName: profile.displayName,
       });
     } catch {
-      // The local profile remains usable if the optional Auth profile sync fails.
+      // Firestore remains the source of truth for the app profile.
     }
 
     return profile;
@@ -134,7 +119,7 @@ export async function signIn(email: string, password: string) {
     email.trim(),
     password
   );
-  return getUserProfile(credential.user);
+  return loadUserProfile(credential.user);
 }
 
 export async function signOut() {
@@ -142,7 +127,7 @@ export async function signOut() {
 }
 
 export function subscribeToAuthState(
-  callback: (user: User | null) => void
+  callback: (user: FirebaseUser | null) => void
 ) {
   return onAuthStateChanged(auth, callback);
 }
@@ -181,6 +166,10 @@ export function getReadableAuthError(error: unknown) {
     'auth/user-not-found': 'No account was found for this email.',
     'auth/weak-password': 'Use a password with at least 6 characters.',
     'auth/wrong-password': 'The email or password is incorrect.',
+    'firestore/permission-denied':
+      'Firestore denied access to this profile. Check your security rules.',
+    'firestore/unavailable':
+      'The profile service is temporarily unavailable. Try again.',
   };
 
   return (

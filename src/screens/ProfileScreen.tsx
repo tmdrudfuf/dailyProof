@@ -32,6 +32,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { friends } = useFriends();
   const displayName = profile?.displayName ?? 'DailyProof User';
   const username = profile?.username ?? '@yourname';
+  const currentStreak = profile?.currentStreak ?? 0;
   const initials = displayName
     .split(' ')
     .map((part) => part[0])
@@ -88,7 +89,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           </View>
           <View style={styles.divider} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>7</Text>
+            <Text style={styles.statValue}>{currentStreak}</Text>
             <Text style={styles.statLabel}>DAY STREAK</Text>
           </View>
           <View style={styles.divider} />
