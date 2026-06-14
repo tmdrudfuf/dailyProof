@@ -3,6 +3,7 @@ import { Goal } from '../types/goal';
 export const mockGoals: Goal[] = [
   {
     id: 'goal-workout',
+    userId: 'mock-user',
     category: 'Exercise',
     categoryEmoji: '💪',
     title: 'Morning Workout',
@@ -17,6 +18,7 @@ export const mockGoals: Goal[] = [
   },
   {
     id: 'goal-jlpt',
+    userId: 'mock-user',
     category: 'Study',
     categoryEmoji: '📚',
     title: 'JLPT N2 Study',
@@ -31,6 +33,7 @@ export const mockGoals: Goal[] = [
   },
   {
     id: 'goal-reading',
+    userId: 'mock-user',
     category: 'Reading',
     categoryEmoji: '📖',
     title: 'Reading',

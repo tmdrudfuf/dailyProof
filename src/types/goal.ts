@@ -13,6 +13,7 @@ export type GoalCategory =
 
 export type Goal = {
   id: string;
+  userId: string;
   category: GoalCategory;
   categoryEmoji: string;
   title: string;
@@ -28,5 +29,9 @@ export type Goal = {
 
 export type NewGoal = Omit<
   Goal,
-  'id' | 'completedDays' | 'isActive' | 'createdAt'
+  'id' | 'userId' | 'completedDays' | 'isActive' | 'createdAt'
+>;
+
+export type GoalUpdates = Partial<
+  Omit<Goal, 'id' | 'userId' | 'createdAt'>
 >;

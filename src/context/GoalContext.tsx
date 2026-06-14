@@ -17,14 +17,19 @@ import {
   updateGoal,
 } from '../services/goalService';
 import { Goal, NewGoal } from '../types/goal';
+import { useAuth } from './AuthContext';
 
 type GoalContextValue = {
   goals: Goal[];
   activeGoals: Goal[];
   canAddGoal: boolean;
+  isLoading: boolean;
+  isSaving: boolean;
+  error: string;
   addGoal: (goal: NewGoal) => Promise<boolean>;
   deleteGoal: (goalId: string) => Promise<void>;
   incrementGoalCompletedDays: (goalId: string) => Promise<void>;
+  refreshGoals: () => Promise<void>;
 };
 
 const GoalContext = createContext<GoalContextValue | undefined>(undefined);
@@ -34,28 +39,56 @@ type GoalProviderProps = {
 };
 
 export function GoalProvider({ children }: GoalProviderProps) {
+  const { firebaseUser } = useAuth();
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
   const isCreatingGoal = useRef(false);
+  const loadRequestId = useRef(0);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadGoals = useCallback(async () => {
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
 
-    async function restoreGoals() {
-      const storedGoals = await getGoals();
-
-      if (isMounted) {
-        setGoals(storedGoals);
-        setIsHydrated(true);
-      }
+    if (!firebaseUser) {
+      setGoals([]);
+      setError('');
+      setIsLoading(false);
+      return;
     }
 
-    void restoreGoals();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const loadedGoals = await getGoals(firebaseUser.uid);
+      if (loadRequestId.current === requestId) {
+        setGoals(loadedGoals);
+      }
+    } catch (loadError) {
+      if (loadRequestId.current === requestId) {
+        setGoals([]);
+        setError(getGoalErrorMessage(loadError));
+      }
+    } finally {
+      if (loadRequestId.current === requestId) {
+        setIsLoading(false);
+      }
+    }
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    void loadGoals();
 
     return () => {
-      isMounted = false;
+      loadRequestId.current += 1;
     };
-  }, []);
+  }, [loadGoals]);
+
+  const refreshGoals = useCallback(async () => {
+    await loadGoals();
+  }, [loadGoals]);
 
   const activeGoals = useMemo(
     () => goals.filter((goal) => goal.isActive),
@@ -65,7 +98,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
 
   const addGoal = useCallback(
     async (newGoal: NewGoal) => {
-      if (!canAddGoal) {
+      if (!firebaseUser || !canAddGoal) {
         return false;
       }
 
@@ -74,25 +107,38 @@ export function GoalProvider({ children }: GoalProviderProps) {
       }
 
       isCreatingGoal.current = true;
+      setIsSaving(true);
+      setError('');
 
       try {
-        const goal = await createGoal(newGoal);
+        const goal = await createGoal({
+          ...newGoal,
+          userId: firebaseUser.uid,
+        });
         setGoals((currentGoals) => [goal, ...currentGoals]);
         return true;
-      } catch {
+      } catch (createError) {
+        setError(getGoalErrorMessage(createError));
         return false;
       } finally {
         isCreatingGoal.current = false;
+        setIsSaving(false);
       }
     },
-    [canAddGoal]
+    [canAddGoal, firebaseUser]
   );
 
   const deleteGoal = useCallback(async (goalId: string) => {
-    await deleteStoredGoal(goalId);
-    setGoals((currentGoals) =>
-      currentGoals.filter((goal) => goal.id !== goalId)
-    );
+    setError('');
+
+    try {
+      await deleteStoredGoal(goalId);
+      setGoals((currentGoals) =>
+        currentGoals.filter((goal) => goal.id !== goalId)
+      );
+    } catch (deleteError) {
+      setError(getGoalErrorMessage(deleteError));
+    }
   }, []);
 
   const incrementGoalCompletedDays = useCallback(
@@ -103,16 +149,17 @@ export function GoalProvider({ children }: GoalProviderProps) {
         return;
       }
 
-      const updatedGoal = await updateGoal(goalId, {
-        completedDays: goal.completedDays + 1,
-      });
+      const completedDays = goal.completedDays + 1;
 
-      if (updatedGoal) {
+      try {
+        await updateGoal(goalId, { completedDays });
         setGoals((currentGoals) =>
           currentGoals.map((item) =>
-            item.id === goalId ? updatedGoal : item
+            item.id === goalId ? { ...item, completedDays } : item
           )
         );
+      } catch (updateError) {
+        setError(getGoalErrorMessage(updateError));
       }
     },
     [goals]
@@ -123,25 +170,47 @@ export function GoalProvider({ children }: GoalProviderProps) {
       goals,
       activeGoals,
       canAddGoal,
+      isLoading,
+      isSaving,
+      error,
       addGoal,
       deleteGoal,
       incrementGoalCompletedDays,
+      refreshGoals,
     }),
     [
       goals,
       activeGoals,
       canAddGoal,
+      isLoading,
+      isSaving,
+      error,
       addGoal,
       deleteGoal,
       incrementGoalCompletedDays,
+      refreshGoals,
     ]
   );
 
-  if (!isHydrated) {
-    return null;
+  return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;
+}
+
+function getGoalErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes('up to 3 active goals')) {
+      return error.message;
+    }
+
+    if (error.message.includes('permission-denied')) {
+      return 'Goal access was denied. Check your Firestore rules.';
+    }
+
+    if (error.message.includes('unavailable')) {
+      return 'Goals are temporarily unavailable. Check your connection.';
+    }
   }
 
-  return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>;
+  return 'Something went wrong while working with your goals. Please try again.';
 }
 
 export function useGoals() {

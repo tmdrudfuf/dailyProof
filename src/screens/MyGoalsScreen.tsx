@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
@@ -21,7 +22,14 @@ type MyGoalsScreenProps = NativeStackScreenProps<
 >;
 
 export function MyGoalsScreen({ navigation }: MyGoalsScreenProps) {
-  const { activeGoals, canAddGoal, deleteGoal } = useGoals();
+  const {
+    activeGoals,
+    canAddGoal,
+    deleteGoal,
+    error,
+    isLoading,
+    refreshGoals,
+  } = useGoals();
 
   function confirmDelete(goalId: string, goalTitle: string) {
     Alert.alert(
@@ -46,37 +54,52 @@ export function MyGoalsScreen({ navigation }: MyGoalsScreenProps) {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyExtractor={(goal) => goal.id}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Ionicons color={colors.ink} name="flag-outline" size={30} />
+          isLoading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={colors.ink} size="large" />
+              <Text style={styles.emptyText}>Loading your goals...</Text>
             </View>
-            <Text style={styles.emptyTitle}>Start with one promise.</Text>
-            <Text style={styles.emptyText}>
-              Create a goal you can prove with small, consistent actions.
-            </Text>
-          </View>
+          ) : error ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Could not load goals.</Text>
+              <Text style={styles.emptyText}>{error}</Text>
+              <Pressable onPress={() => void refreshGoals()} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons color={colors.ink} name="flag-outline" size={30} />
+              </View>
+              <Text style={styles.emptyTitle}>Start with one promise.</Text>
+              <Text style={styles.emptyText}>
+                Create a goal you can prove with small, consistent actions.
+              </Text>
+            </View>
+          )
         }
         ListFooterComponent={
           <View style={styles.footer}>
             <Pressable
               accessibilityRole="button"
-              disabled={!canAddGoal}
+              disabled={!canAddGoal || isLoading}
               onPress={() => navigation.navigate('CreateGoal')}
               style={({ pressed }) => [
                 styles.addButton,
-                !canAddGoal && styles.addButtonDisabled,
-                pressed && canAddGoal && styles.addButtonPressed,
+                (!canAddGoal || isLoading) && styles.addButtonDisabled,
+                pressed && canAddGoal && !isLoading && styles.addButtonPressed,
               ]}
             >
               <Ionicons
-                color={canAddGoal ? colors.ink : colors.muted}
+                color={canAddGoal && !isLoading ? colors.ink : colors.muted}
                 name="add"
                 size={21}
               />
               <Text
                 style={[
                   styles.addButtonText,
-                  !canAddGoal && styles.addButtonTextDisabled,
+                  (!canAddGoal || isLoading) && styles.addButtonTextDisabled,
                 ]}
               >
                 Add Goal
@@ -113,6 +136,15 @@ export function MyGoalsScreen({ navigation }: MyGoalsScreenProps) {
                 Keep your focus narrow. You can work on up to three active goals.
               </Text>
             </View>
+
+            {error && !isLoading && activeGoals.length > 0 ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{error}</Text>
+                <Pressable onPress={() => void refreshGoals()}>
+                  <Text style={styles.errorBannerAction}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <Text style={styles.sectionTitle}>ACTIVE GOALS</Text>
           </>
@@ -198,6 +230,27 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginTop: 25,
   },
+  errorBanner: {
+    alignItems: 'center',
+    backgroundColor: '#FBE9E6',
+    borderRadius: radii.medium,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginTop: 14,
+    padding: 13,
+  },
+  errorBannerText: {
+    color: '#8E342D',
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  errorBannerAction: {
+    color: '#8E342D',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   separator: {
     height: 12,
   },
@@ -263,5 +316,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 10,
     textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+  },
+  retryButtonText: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

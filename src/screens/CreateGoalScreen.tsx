@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -113,7 +114,12 @@ function getTotalDays(startDate: string, endDate: string) {
 }
 
 export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
-  const { addGoal, canAddGoal } = useGoals();
+  const {
+    addGoal,
+    canAddGoal,
+    error: goalError,
+    isSaving,
+  } = useGoals();
   const initialDates = getInitialDates();
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CategoryOption | null>(null);
@@ -462,32 +468,38 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
             <Text style={styles.limitText}>
               You can have up to 3 active goals.
             </Text>
-          ) : error ? (
-            <Text style={styles.errorText}>{error}</Text>
+          ) : goalError || error ? (
+            <Text style={styles.errorText}>{goalError || error}</Text>
           ) : null}
           <Pressable
             accessibilityRole="button"
-            disabled={!canAddGoal}
+            disabled={!canAddGoal || isSaving}
             onPress={handleContinue}
             style={({ pressed }) => [
               styles.continueButton,
-              !canAddGoal && styles.continueButtonDisabled,
-              pressed && canAddGoal && styles.continueButtonPressed,
+              (!canAddGoal || isSaving) && styles.continueButtonDisabled,
+              pressed && canAddGoal && !isSaving && styles.continueButtonPressed,
             ]}
           >
-            <Text
-              style={[
-                styles.continueText,
-                !canAddGoal && styles.continueTextDisabled,
-              ]}
-            >
-              {step === steps.length - 1 ? 'Create Goal' : 'Continue'}
-            </Text>
-            <Ionicons
-              color={canAddGoal ? colors.ink : colors.muted}
-              name={step === steps.length - 1 ? 'checkmark' : 'arrow-forward'}
-              size={20}
-            />
+            {isSaving ? (
+              <ActivityIndicator color={colors.muted} />
+            ) : (
+              <>
+                <Text
+                  style={[
+                    styles.continueText,
+                    !canAddGoal && styles.continueTextDisabled,
+                  ]}
+                >
+                  {step === steps.length - 1 ? 'Create Goal' : 'Continue'}
+                </Text>
+                <Ionicons
+                  color={canAddGoal ? colors.ink : colors.muted}
+                  name={step === steps.length - 1 ? 'checkmark' : 'arrow-forward'}
+                  size={20}
+                />
+              </>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
