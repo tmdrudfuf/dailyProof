@@ -24,6 +24,7 @@ type CheckInContextValue = {
   checkIns: CheckIn[];
   checkInFeedPosts: FeedPost[];
   isLoading: boolean;
+  isUploading: boolean;
   error: string;
   hasCheckedInToday: (goalId: string) => boolean;
   submitCheckIn: (goal: Goal, photoUrl: string) => Promise<CheckIn>;
@@ -88,7 +89,9 @@ function getCheckInErrorMessage(error: unknown) {
 
     if (
       error.message.includes('no longer exists') ||
-      error.message.includes('do not have access')
+      error.message.includes('do not have access') ||
+      error.message.includes('Photo upload') ||
+      error.message.includes('captured photo')
     ) {
       return error.message;
     }
@@ -102,6 +105,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
   const { goals, refreshGoals } = useGoals();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const loadRequestId = useRef(0);
 
@@ -174,6 +178,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
           goal.category,
           goal.title
         );
+        setIsUploading(true);
         const result = await createCheckIn({
           userId: firebaseUser.uid,
           goalId: goal.id,
@@ -195,8 +200,11 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
 
         return result.checkIn;
       } catch (submitError) {
-        setError(getCheckInErrorMessage(submitError));
-        throw submitError;
+        const errorMessage = getCheckInErrorMessage(submitError);
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setIsUploading(false);
       }
     },
     [firebaseUser, refreshGoals]
@@ -233,6 +241,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       checkIns,
       checkInFeedPosts,
       isLoading,
+      isUploading,
       error,
       hasCheckedInToday,
       submitCheckIn,
@@ -242,6 +251,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       checkIns,
       checkInFeedPosts,
       isLoading,
+      isUploading,
       error,
       hasCheckedInToday,
       submitCheckIn,

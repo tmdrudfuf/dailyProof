@@ -10,6 +10,10 @@ import {
 import { CheckIn, NewCheckIn } from '../types/checkIn';
 import { Goal } from '../types/goal';
 import { auth, db } from './firebase';
+import {
+  deleteCheckInPhoto,
+  uploadCheckInPhoto,
+} from './storageService';
 
 const CHECK_INS_COLLECTION = 'checkIns';
 const GOALS_COLLECTION = 'goals';
@@ -88,44 +92,55 @@ export async function createCheckIn(
 ): Promise<CreateCheckInResult> {
   const checkInReference = doc(collection(db, CHECK_INS_COLLECTION));
   const goalReference = doc(db, GOALS_COLLECTION, newCheckIn.goalId);
+  const photoUrl = await uploadCheckInPhoto(
+    newCheckIn.userId,
+    checkInReference.id,
+    newCheckIn.photoUrl
+  );
   const createdAt = new Date().toISOString();
   const today = getLocalDateKey(new Date(createdAt));
   const checkIn: CheckIn = {
     ...newCheckIn,
     id: checkInReference.id,
+    photoUrl,
     createdAt,
   };
 
-  const shouldIncrementGoal = await runTransaction(
-    db,
-    async (transaction) => {
-      const goalSnapshot = await transaction.get(goalReference);
+  try {
+    const shouldIncrementGoal = await runTransaction(
+      db,
+      async (transaction) => {
+        const goalSnapshot = await transaction.get(goalReference);
 
-      if (!goalSnapshot.exists()) {
-        throw new Error('The selected goal no longer exists.');
+        if (!goalSnapshot.exists()) {
+          throw new Error('The selected goal no longer exists.');
+        }
+
+        const goal = goalSnapshot.data() as Goal;
+        if (goal.userId !== newCheckIn.userId) {
+          throw new Error('You do not have access to this goal.');
+        }
+
+        const shouldIncrement =
+          newCheckIn.aiResult === 'approved' &&
+          goal.lastCompletedDate !== today;
+
+        transaction.set(checkInReference, checkIn);
+
+        if (shouldIncrement) {
+          transaction.update(goalReference, {
+            completedDays: goal.completedDays + 1,
+            lastCompletedDate: today,
+          });
+        }
+
+        return shouldIncrement;
       }
+    );
 
-      const goal = goalSnapshot.data() as Goal;
-      if (goal.userId !== newCheckIn.userId) {
-        throw new Error('You do not have access to this goal.');
-      }
-
-      const shouldIncrement =
-        newCheckIn.aiResult === 'approved' &&
-        goal.lastCompletedDate !== today;
-
-      transaction.set(checkInReference, checkIn);
-
-      if (shouldIncrement) {
-        transaction.update(goalReference, {
-          completedDays: goal.completedDays + 1,
-          lastCompletedDate: today,
-        });
-      }
-
-      return shouldIncrement;
-    }
-  );
-
-  return { checkIn, shouldIncrementGoal };
+    return { checkIn, shouldIncrementGoal };
+  } catch (error) {
+    await deleteCheckInPhoto(newCheckIn.userId, checkInReference.id);
+    throw error;
+  }
 }

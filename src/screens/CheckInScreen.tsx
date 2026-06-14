@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useCheckIns } from '../context/CheckInContext';
 import { useGoals } from '../context/GoalContext';
-import { persistCheckInPhoto } from '../services/photoStorage';
 import { colors, radii } from '../theme';
 import { CameraStackParamList } from '../types/navigation';
 
@@ -28,7 +27,11 @@ export function CheckInScreen({
   route,
 }: CheckInScreenProps) {
   const { goals } = useGoals();
-  const { hasCheckedInToday, submitCheckIn } = useCheckIns();
+  const {
+    hasCheckedInToday,
+    isUploading,
+    submitCheckIn,
+  } = useCheckIns();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -80,12 +83,13 @@ export function CheckInScreen({
     setSubmitError('');
 
     try {
-      const storedPhotoUri = await persistCheckInPhoto(photoUri);
-      const checkIn = await submitCheckIn(goal, storedPhotoUri);
+      const checkIn = await submitCheckIn(goal, photoUri);
       navigation.replace('CheckInResult', { checkInId: checkIn.id });
-    } catch {
+    } catch (error) {
       setSubmitError(
-        'Your check-in could not be saved. Check your connection and try again.'
+        error instanceof Error
+          ? error.message
+          : 'Your check-in could not be saved. Please try again.'
       );
       setIsSubmitting(false);
     }
@@ -249,7 +253,12 @@ export function CheckInScreen({
               ]}
             >
               {isSubmitting ? (
-                <ActivityIndicator color={colors.ink} size="small" />
+                <View style={styles.uploadingContent}>
+                  <ActivityIndicator color={colors.ink} size="small" />
+                  <Text style={styles.uploadingText}>
+                    {isUploading ? 'Uploading photo...' : 'Preparing...'}
+                  </Text>
+                </View>
               ) : (
                 <>
                   <Text style={styles.submitText}>Submit</Text>
@@ -280,6 +289,16 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 12,
     textAlign: 'center',
+  },
+  uploadingContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  uploadingText: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '900',
   },
   topBar: {
     alignItems: 'center',
