@@ -1,7 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import * as FirebaseAuth from 'firebase/auth';
+import type { Persistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { Platform } from 'react-native';
 
 // Copy these values from:
 // Firebase Console -> Project settings -> Your apps -> Web app.
@@ -20,10 +23,37 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? 'replace-me',
 };
 
+export const isFirebaseConfigured = Object.values(firebaseConfig).every(
+  (value) => value.length > 0 && !value.includes('replace-me')
+);
+
 // Reuse the initialized app during Expo Fast Refresh.
 const firebaseApp =
   getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-export const auth = getAuth(firebaseApp);
+type ReactNativeAuthModule = typeof FirebaseAuth & {
+  getReactNativePersistence: (
+    storage: typeof AsyncStorage
+  ) => Persistence;
+};
+
+function initializeFirebaseAuth() {
+  if (Platform.OS === 'web') {
+    return FirebaseAuth.getAuth(firebaseApp);
+  }
+
+  try {
+    const { getReactNativePersistence } =
+      FirebaseAuth as ReactNativeAuthModule;
+
+    return FirebaseAuth.initializeAuth(firebaseApp, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    return FirebaseAuth.getAuth(firebaseApp);
+  }
+}
+
+export const auth = initializeFirebaseAuth();
 export const db = getFirestore(firebaseApp);
 export const storage = getStorage(firebaseApp);

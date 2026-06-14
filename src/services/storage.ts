@@ -4,6 +4,7 @@ export const storageKeys = {
   goals: '@dailyproof/goals',
   checkInState: '@dailyproof/check-in-state',
   friendReactions: '@dailyproof/friend-reactions',
+  userProfiles: '@dailyproof/user-profiles',
 } as const;
 
 export async function readStoredJson<T>(

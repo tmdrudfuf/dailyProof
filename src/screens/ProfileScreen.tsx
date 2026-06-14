@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
 import { ProfileMenuItem } from '../components/ProfileMenuItem';
+import { useAuth } from '../context/AuthContext';
 import { useFriends } from '../context/FriendContext';
 import { useGoals } from '../context/GoalContext';
 import { colors, radii } from '../theme';
@@ -26,8 +27,17 @@ const week = [
 ];
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
+  const { logout, profile } = useAuth();
   const { activeGoals } = useGoals();
   const { friends } = useFriends();
+  const displayName = profile?.displayName ?? 'DailyProof User';
+  const username = profile?.username ?? '@yourname';
+  const initials = displayName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
   const menuItems = [
     {
       label: 'My Goals',
@@ -43,6 +53,13 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       onPress: () => navigation.navigate('Friends'),
     },
     { label: 'Settings', icon: 'settings-outline' as const },
+    {
+      label: 'Log Out',
+      icon: 'log-out-outline' as const,
+      onPress: () => {
+        void logout();
+      },
+    },
   ];
 
   return (
@@ -56,10 +73,10 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
 
         <View style={styles.identity}>
-          <Avatar initials="DP" size={82} />
+          <Avatar initials={initials || 'DP'} size={82} />
           <View style={styles.identityCopy}>
-            <Text style={styles.name}>DailyProof User</Text>
-            <Text style={styles.handle}>@yourname</Text>
+            <Text style={styles.name}>{displayName}</Text>
+            <Text style={styles.handle}>{username}</Text>
             <Text style={styles.bio}>Doing the small things I said I would.</Text>
           </View>
         </View>
