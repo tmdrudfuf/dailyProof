@@ -1,5 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
@@ -30,7 +37,13 @@ function getCheckInTime(createdAt?: string) {
 }
 
 export function FeedScreen() {
-  const { checkInFeedPosts, hasCheckedInToday } = useCheckIns();
+  const {
+    checkInFeedPosts,
+    error: checkInError,
+    hasCheckedInToday,
+    isLoading: isLoadingCheckIns,
+    refreshCheckIns,
+  } = useCheckIns();
   const { friendFeedItems, reactions, toggleReaction } = useFriends();
   const { activeGoals } = useGoals();
   const restoredCheckInPosts = checkInFeedPosts.map((post) => ({
@@ -133,6 +146,22 @@ export function FeedScreen() {
                 <Text style={styles.filterText}>Following</Text>
               </View>
             </View>
+
+            {isLoadingCheckIns ? (
+              <View style={styles.statusBanner}>
+                <ActivityIndicator color={colors.ink} size="small" />
+                <Text style={styles.statusText}>Loading your check-ins...</Text>
+              </View>
+            ) : checkInError ? (
+              <View style={[styles.statusBanner, styles.errorBanner]}>
+                <Text style={[styles.statusText, styles.errorText]}>
+                  {checkInError}
+                </Text>
+                <Pressable onPress={() => void refreshCheckIns()}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </>
         }
         renderItem={({ item }) => (
@@ -320,5 +349,30 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 14,
+  },
+  statusBanner: {
+    alignItems: 'center',
+    backgroundColor: colors.softGreen,
+    borderRadius: radii.medium,
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+    padding: 12,
+  },
+  statusText: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 12,
+  },
+  errorBanner: {
+    backgroundColor: '#FBE9E6',
+  },
+  errorText: {
+    color: '#8E342D',
+  },
+  retryText: {
+    color: '#8E342D',
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

@@ -25,6 +25,7 @@ export type Goal = {
   visibility: GoalVisibility;
   isActive: boolean;
   createdAt: string;
+  lastCompletedDate?: string;
 };
 
 export type NewGoal = Omit<

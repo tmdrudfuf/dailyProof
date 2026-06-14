@@ -14,7 +14,6 @@ import {
   deleteGoal as deleteStoredGoal,
   getGoals,
   MAX_ACTIVE_GOALS,
-  updateGoal,
 } from '../services/goalService';
 import { Goal, NewGoal } from '../types/goal';
 import { useAuth } from './AuthContext';
@@ -28,7 +27,6 @@ type GoalContextValue = {
   error: string;
   addGoal: (goal: NewGoal) => Promise<boolean>;
   deleteGoal: (goalId: string) => Promise<void>;
-  incrementGoalCompletedDays: (goalId: string) => Promise<void>;
   refreshGoals: () => Promise<void>;
 };
 
@@ -141,30 +139,6 @@ export function GoalProvider({ children }: GoalProviderProps) {
     }
   }, []);
 
-  const incrementGoalCompletedDays = useCallback(
-    async (goalId: string) => {
-      const goal = goals.find((item) => item.id === goalId);
-
-      if (!goal) {
-        return;
-      }
-
-      const completedDays = goal.completedDays + 1;
-
-      try {
-        await updateGoal(goalId, { completedDays });
-        setGoals((currentGoals) =>
-          currentGoals.map((item) =>
-            item.id === goalId ? { ...item, completedDays } : item
-          )
-        );
-      } catch (updateError) {
-        setError(getGoalErrorMessage(updateError));
-      }
-    },
-    [goals]
-  );
-
   const value = useMemo(
     () => ({
       goals,
@@ -175,7 +149,6 @@ export function GoalProvider({ children }: GoalProviderProps) {
       error,
       addGoal,
       deleteGoal,
-      incrementGoalCompletedDays,
       refreshGoals,
     }),
     [
@@ -187,7 +160,6 @@ export function GoalProvider({ children }: GoalProviderProps) {
       error,
       addGoal,
       deleteGoal,
-      incrementGoalCompletedDays,
       refreshGoals,
     ]
   );

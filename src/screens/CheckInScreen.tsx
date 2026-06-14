@@ -34,6 +34,7 @@ export function CheckInScreen({
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const goal = goals.find((item) => item.id === route.params.goalId);
   const provedToday = goal ? hasCheckedInToday(goal.id) : false;
 
@@ -76,9 +77,18 @@ export function CheckInScreen({
     }
 
     setIsSubmitting(true);
-    const storedPhotoUri = await persistCheckInPhoto(photoUri);
-    const checkIn = await submitCheckIn(goal, storedPhotoUri);
-    navigation.replace('CheckInResult', { checkInId: checkIn.id });
+    setSubmitError('');
+
+    try {
+      const storedPhotoUri = await persistCheckInPhoto(photoUri);
+      const checkIn = await submitCheckIn(goal, storedPhotoUri);
+      navigation.replace('CheckInResult', { checkInId: checkIn.id });
+    } catch {
+      setSubmitError(
+        'Your check-in could not be saved. Check your connection and try again.'
+      );
+      setIsSubmitting(false);
+    }
   }
 
   function renderCamera() {
@@ -248,6 +258,9 @@ export function CheckInScreen({
               )}
             </Pressable>
           </View>
+          {submitError ? (
+            <Text style={styles.submitError}>{submitError}</Text>
+          ) : null}
         </View>
       ) : (
         renderCamera()
@@ -260,6 +273,13 @@ const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: '#111310',
     flex: 1,
+  },
+  submitError: {
+    color: '#A23A32',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 12,
+    textAlign: 'center',
   },
   topBar: {
     alignItems: 'center',

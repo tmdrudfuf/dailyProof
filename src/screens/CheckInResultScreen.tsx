@@ -46,8 +46,12 @@ export function CheckInResultScreen({
         <View style={styles.resultCard}>
           <Text style={styles.cardLabel}>GOAL</Text>
           <View style={styles.goalRow}>
-            <Text style={styles.goalEmoji}>{goal?.categoryEmoji ?? '✨'}</Text>
-            <Text style={styles.goalTitle}>{goal?.title ?? 'Goal'}</Text>
+            <Text style={styles.goalEmoji}>
+              {checkIn?.categoryEmoji ?? goal?.categoryEmoji ?? '✨'}
+            </Text>
+            <Text style={styles.goalTitle}>
+              {checkIn?.goalTitle ?? goal?.title ?? 'Goal'}
+            </Text>
           </View>
           <View style={styles.divider} />
           <Text style={styles.cardLabel}>CONFIDENCE</Text>

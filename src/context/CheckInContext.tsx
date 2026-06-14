@@ -5,24 +5,29 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {
   createCheckIn,
   getCheckIns,
-  getFeedItems,
 } from '../services/checkInService';
+import { verifyCheckInPhoto } from '../services/verificationService';
 import { CheckIn } from '../types/checkIn';
 import { FeedPost } from '../types/feed';
-import { Goal } from '../types/goal';
+import { Goal, GoalCategory } from '../types/goal';
+import { useAuth } from './AuthContext';
 import { useGoals } from './GoalContext';
 
 type CheckInContextValue = {
   checkIns: CheckIn[];
   checkInFeedPosts: FeedPost[];
+  isLoading: boolean;
+  error: string;
   hasCheckedInToday: (goalId: string) => boolean;
   submitCheckIn: (goal: Goal, photoUrl: string) => Promise<CheckIn>;
+  refreshCheckIns: () => Promise<void>;
 };
 
 const CheckInContext = createContext<CheckInContextValue | undefined>(
@@ -33,45 +38,115 @@ type CheckInProviderProps = {
   children: ReactNode;
 };
 
-function isSameCalendarDay(firstDate: string, secondDate: string) {
-  const first = new Date(firstDate);
-  const second = new Date(secondDate);
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
+function isSameCalendarDay(firstDate: string, secondDate: string) {
   return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
+    getLocalDateKey(new Date(firstDate)) ===
+    getLocalDateKey(new Date(secondDate))
   );
 }
 
-export function CheckInProvider({ children }: CheckInProviderProps) {
-  const { incrementGoalCompletedDays } = useGoals();
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [checkInFeedPosts, setCheckInFeedPosts] = useState<FeedPost[]>([]);
-  const [isHydrated, setIsHydrated] = useState(false);
+function getVisual(category: GoalCategory): FeedPost['visual'] {
+  if (category === 'Exercise') {
+    return 'run';
+  }
 
-  useEffect(() => {
-    let isMounted = true;
+  if (category === 'Reading') {
+    return 'read';
+  }
 
-    async function restoreCheckInState() {
-      const [storedCheckIns, storedFeedItems] = await Promise.all([
-        getCheckIns(),
-        getFeedItems(),
-      ]);
+  return 'build';
+}
 
-      if (isMounted) {
-        setCheckIns(storedCheckIns);
-        setCheckInFeedPosts(storedFeedItems);
-        setIsHydrated(true);
-      }
+function getInitials(displayName: string) {
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || 'DP';
+}
+
+function getCheckInErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes('permission-denied')) {
+      return 'Check-in access was denied. Check your Firestore rules.';
     }
 
-    void restoreCheckInState();
+    if (error.message.includes('unavailable')) {
+      return 'Check-ins are temporarily unavailable. Check your connection.';
+    }
+
+    if (
+      error.message.includes('no longer exists') ||
+      error.message.includes('do not have access')
+    ) {
+      return error.message;
+    }
+  }
+
+  return 'Something went wrong with your check-in. Please try again.';
+}
+
+export function CheckInProvider({ children }: CheckInProviderProps) {
+  const { firebaseUser, profile } = useAuth();
+  const { goals, refreshGoals } = useGoals();
+  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const loadRequestId = useRef(0);
+
+  const loadCheckIns = useCallback(async () => {
+    const requestId = loadRequestId.current + 1;
+    loadRequestId.current = requestId;
+
+    if (!firebaseUser) {
+      setCheckIns([]);
+      setError('');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const loadedCheckIns = await getCheckIns(firebaseUser.uid);
+      if (loadRequestId.current === requestId) {
+        setCheckIns(loadedCheckIns);
+      }
+    } catch (loadError) {
+      if (loadRequestId.current === requestId) {
+        setCheckIns([]);
+        setError(getCheckInErrorMessage(loadError));
+      }
+    } finally {
+      if (loadRequestId.current === requestId) {
+        setIsLoading(false);
+      }
+    }
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    void loadCheckIns();
 
     return () => {
-      isMounted = false;
+      loadRequestId.current += 1;
     };
-  }, []);
+  }, [loadCheckIns]);
+
+  const refreshCheckIns = useCallback(async () => {
+    await loadCheckIns();
+  }, [loadCheckIns]);
 
   const hasCheckedInToday = useCallback(
     (goalId: string) => {
@@ -87,39 +162,92 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
 
   const submitCheckIn = useCallback(
     async (goal: Goal, photoUrl: string) => {
-      const result = await createCheckIn(goal, photoUrl);
-
-      setCheckIns((currentCheckIns) => [
-        result.checkIn,
-        ...currentCheckIns,
-      ]);
-      setCheckInFeedPosts((currentPosts) => [
-        result.feedPost,
-        ...currentPosts,
-      ]);
-
-      if (result.shouldIncrementGoal) {
-        await incrementGoalCompletedDays(goal.id);
+      if (!firebaseUser) {
+        throw new Error('You must be logged in to check in.');
       }
 
-      return result.checkIn;
+      setError('');
+
+      try {
+        const verification = await verifyCheckInPhoto(
+          photoUrl,
+          goal.category,
+          goal.title
+        );
+        const result = await createCheckIn({
+          userId: firebaseUser.uid,
+          goalId: goal.id,
+          goalTitle: goal.title,
+          category: goal.category,
+          categoryEmoji: goal.categoryEmoji,
+          photoUrl,
+          ...verification,
+        });
+
+        setCheckIns((currentCheckIns) => [
+          result.checkIn,
+          ...currentCheckIns,
+        ]);
+
+        if (result.shouldIncrementGoal) {
+          await refreshGoals();
+        }
+
+        return result.checkIn;
+      } catch (submitError) {
+        setError(getCheckInErrorMessage(submitError));
+        throw submitError;
+      }
     },
-    [incrementGoalCompletedDays]
+    [firebaseUser, refreshGoals]
   );
+
+  const checkInFeedPosts = useMemo<FeedPost[]>(() => {
+    const displayName =
+      profile?.displayName ?? firebaseUser?.displayName ?? 'You';
+    const initials = getInitials(displayName);
+
+    return checkIns.map((checkIn) => {
+      const goal = goals.find((item) => item.id === checkIn.goalId);
+
+      return {
+        id: checkIn.id,
+        friendName: displayName,
+        initials,
+        goal: checkIn.goalTitle,
+        proof: "Checked in and kept today's promise.",
+        timeAgo: 'Just now',
+        streak: goal?.completedDays ?? 0,
+        reactions: 0,
+        visual: getVisual(checkIn.category),
+        categoryEmoji: checkIn.categoryEmoji,
+        photoUrl: checkIn.photoUrl,
+        isCheckIn: true,
+        createdAt: checkIn.createdAt,
+      };
+    });
+  }, [checkIns, firebaseUser, goals, profile]);
 
   const value = useMemo(
     () => ({
       checkIns,
       checkInFeedPosts,
+      isLoading,
+      error,
       hasCheckedInToday,
       submitCheckIn,
+      refreshCheckIns,
     }),
-    [checkIns, checkInFeedPosts, hasCheckedInToday, submitCheckIn]
+    [
+      checkIns,
+      checkInFeedPosts,
+      isLoading,
+      error,
+      hasCheckedInToday,
+      submitCheckIn,
+      refreshCheckIns,
+    ]
   );
-
-  if (!isHydrated) {
-    return null;
-  }
 
   return (
     <CheckInContext.Provider value={value}>
