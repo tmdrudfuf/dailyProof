@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
+import { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,55 +33,79 @@ const getInitials = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
-function FriendRow({
+function PersonRow({
   friend,
-  isRequest = false,
+  actions,
 }: {
   friend: Friend;
-  isRequest?: boolean;
+  actions?: ReactNode;
 }) {
   return (
     <View style={styles.friendRow}>
-      <Avatar
-        initials={getInitials(friend.displayName)}
-        size={48}
-        tone={isRequest ? 'blue' : 'lime'}
-      />
+      <Avatar initials={getInitials(friend.displayName)} size={48} tone="lime" />
       <View style={styles.friendCopy}>
         <Text style={styles.friendName}>{friend.displayName}</Text>
         <Text style={styles.username}>{friend.username}</Text>
       </View>
-      {isRequest ? (
-        <View style={styles.requestBadge}>
-          <Text style={styles.requestText}>PENDING</Text>
-        </View>
-      ) : (
-        <View style={styles.streak}>
-          <Text style={styles.streakEmoji}>🔥</Text>
-          <Text style={styles.streakText}>{friend.currentStreak}</Text>
-        </View>
-      )}
+      {actions}
     </View>
   );
 }
 
 export function FriendsScreen({ navigation }: FriendsScreenProps) {
-  const { friends, friendRequests } = useFriends();
+  const {
+    friends,
+    incomingRequests,
+    outgoingRequests,
+    searchResults,
+    isLoading,
+    isSearching,
+    actionUserId,
+    error,
+    searchUsers,
+    sendFriendRequest,
+    acceptFriendRequest,
+    declineFriendRequest,
+    removeFriend,
+    refreshFriends,
+  } = useFriends();
   const [query, setQuery] = useState('');
 
-  const filteredFriends = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void searchUsers(query);
+    }, 350);
 
-    if (!normalizedQuery) {
-      return friends;
-    }
+    return () => clearTimeout(timeout);
+  }, [query, searchUsers]);
 
-    return friends.filter(
-      (friend) =>
-        friend.displayName.toLowerCase().includes(normalizedQuery) ||
-        friend.username.toLowerCase().includes(normalizedQuery)
+  const friendIds = useMemo(
+    () => new Set(friends.map((friend) => friend.id)),
+    [friends]
+  );
+  const outgoingIds = useMemo(
+    () => new Set(outgoingRequests.map((request) => request.user.id)),
+    [outgoingRequests]
+  );
+  const incomingIds = useMemo(
+    () => new Set(incomingRequests.map((request) => request.user.id)),
+    [incomingRequests]
+  );
+
+  function confirmRemove(friend: Friend) {
+    Alert.alert(
+      'Remove friend?',
+      `${friend.displayName} will no longer appear in your friend feed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => void removeFriend(friend.friendshipId),
+        },
+      ]
     );
-  }, [friends, query]);
+  }
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -99,16 +126,130 @@ export function FriendsScreen({ navigation }: FriendsScreenProps) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={() => void refreshFriends()}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>SEARCH</Text>
+        </View>
         <View style={styles.search}>
           <Ionicons color={colors.muted} name="search" size={19} />
           <TextInput
             autoCapitalize="none"
             onChangeText={setQuery}
-            placeholder="Search friends"
+            placeholder="Search name or username"
             placeholderTextColor={colors.muted}
             style={styles.searchInput}
             value={query}
           />
+          {isSearching ? (
+            <ActivityIndicator color={colors.ink} size="small" />
+          ) : null}
+        </View>
+
+        {query.trim() ? (
+          <View style={[styles.card, styles.searchResults]}>
+            {searchResults.length > 0 ? (
+              searchResults.map((user) => {
+                const isFriend = friendIds.has(user.id);
+                const isOutgoing = outgoingIds.has(user.id);
+                const isIncoming = incomingIds.has(user.id);
+                const isWorking = actionUserId === user.id;
+
+                return (
+                  <PersonRow
+                    friend={user}
+                    key={user.id}
+                    actions={
+                      <Pressable
+                        disabled={
+                          isFriend || isOutgoing || isIncoming || isWorking
+                        }
+                        onPress={() => void sendFriendRequest(user.id)}
+                        style={[
+                          styles.primaryButton,
+                          (isFriend || isOutgoing || isIncoming) &&
+                            styles.disabledButton,
+                        ]}
+                      >
+                        {isWorking ? (
+                          <ActivityIndicator color={colors.ink} size="small" />
+                        ) : (
+                          <Text style={styles.primaryButtonText}>
+                            {isFriend
+                              ? 'Friends'
+                              : isOutgoing
+                                ? 'Sent'
+                                : isIncoming
+                                  ? 'Respond below'
+                                  : 'Add Friend'}
+                          </Text>
+                        )}
+                      </Pressable>
+                    }
+                  />
+                );
+              })
+            ) : !isSearching ? (
+              <Text style={styles.emptyText}>No users found.</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>INCOMING REQUESTS</Text>
+          <Text style={styles.sectionCount}>{incomingRequests.length}</Text>
+        </View>
+        <View style={styles.card}>
+          {incomingRequests.length > 0 ? (
+            incomingRequests.map(({ friendship, user }) => {
+              const isWorking = actionUserId === friendship.id;
+              return (
+                <PersonRow
+                  friend={user}
+                  key={friendship.id}
+                  actions={
+                    <View style={styles.requestActions}>
+                      <Pressable
+                        disabled={isWorking}
+                        onPress={() =>
+                          void declineFriendRequest(friendship.id)
+                        }
+                        style={styles.iconAction}
+                      >
+                        <Ionicons color={colors.muted} name="close" size={19} />
+                      </Pressable>
+                      <Pressable
+                        disabled={isWorking}
+                        onPress={() =>
+                          void acceptFriendRequest(friendship.id)
+                        }
+                        style={styles.acceptAction}
+                      >
+                        {isWorking ? (
+                          <ActivityIndicator color={colors.ink} size="small" />
+                        ) : (
+                          <Ionicons
+                            color={colors.ink}
+                            name="checkmark"
+                            size={19}
+                          />
+                        )}
+                      </Pressable>
+                    </View>
+                  }
+                />
+              );
+            })
+          ) : (
+            <Text style={styles.emptyText}>No incoming requests.</Text>
+          )}
         </View>
 
         <View style={styles.sectionHeader}>
@@ -116,23 +257,44 @@ export function FriendsScreen({ navigation }: FriendsScreenProps) {
           <Text style={styles.sectionCount}>{friends.length}</Text>
         </View>
         <View style={styles.card}>
-          {filteredFriends.length > 0 ? (
-            filteredFriends.map((friend) => (
-              <FriendRow friend={friend} key={friend.id} />
+          {isLoading && friends.length === 0 ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator color={colors.ink} />
+              <Text style={styles.emptyText}>Loading friends...</Text>
+            </View>
+          ) : friends.length > 0 ? (
+            friends.map((friend) => (
+              <PersonRow
+                friend={friend}
+                key={friend.id}
+                actions={
+                  <View style={styles.friendActions}>
+                    <View style={styles.streak}>
+                      <Text style={styles.streakEmoji}>🔥</Text>
+                      <Text style={styles.streakText}>
+                        {friend.currentStreak}
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityLabel={`Remove ${friend.displayName}`}
+                      onPress={() => confirmRemove(friend)}
+                      style={styles.removeButton}
+                    >
+                      <Ionicons
+                        color={colors.muted}
+                        name="person-remove-outline"
+                        size={18}
+                      />
+                    </Pressable>
+                  </View>
+                }
+              />
             ))
           ) : (
-            <Text style={styles.emptyText}>No friends match your search.</Text>
+            <Text style={styles.emptyText}>
+              Search for someone to add your first friend.
+            </Text>
           )}
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>FRIEND REQUESTS</Text>
-          <Text style={styles.sectionCount}>{friendRequests.length}</Text>
-        </View>
-        <View style={styles.card}>
-          {friendRequests.map((friend) => (
-            <FriendRow friend={friend} isRequest key={friend.id} />
-          ))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -174,6 +336,25 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
     paddingHorizontal: 18,
   },
+  errorBanner: {
+    alignItems: 'center',
+    backgroundColor: '#FBE9E6',
+    borderRadius: radii.medium,
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+    padding: 13,
+  },
+  errorText: {
+    color: '#8E342D',
+    flex: 1,
+    fontSize: 12,
+  },
+  retryText: {
+    color: '#8E342D',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   search: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -181,7 +362,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.medium,
     borderWidth: 1,
     flexDirection: 'row',
-    marginTop: 24,
     paddingHorizontal: 15,
   },
   searchInput: {
@@ -190,6 +370,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     height: 50,
     marginLeft: 10,
+  },
+  searchResults: {
+    marginTop: 10,
   },
   sectionHeader: {
     alignItems: 'center',
@@ -223,11 +406,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     minHeight: 76,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
   friendCopy: {
     flex: 1,
-    marginLeft: 13,
+    marginLeft: 12,
   },
   friendName: {
     color: colors.ink,
@@ -239,13 +422,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 3,
   },
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    justifyContent: 'center',
+    minHeight: 36,
+    minWidth: 88,
+    paddingHorizontal: 12,
+  },
+  disabledButton: {
+    backgroundColor: colors.line,
+  },
+  primaryButtonText: {
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: 7,
+  },
+  iconAction: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  acceptAction: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  friendActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 7,
+  },
   streak: {
     alignItems: 'center',
     backgroundColor: colors.background,
     borderRadius: radii.pill,
     flexDirection: 'row',
     gap: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 7,
   },
   streakEmoji: {
@@ -256,17 +481,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  requestBadge: {
-    backgroundColor: colors.softBlue,
-    borderRadius: radii.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+  removeButton: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 32,
   },
-  requestText: {
-    color: colors.ink,
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.7,
+  loadingState: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    padding: 18,
   },
   emptyText: {
     color: colors.muted,

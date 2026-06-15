@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { CreateGoalScreen } from '../screens/CreateGoalScreen';
+import { FriendProfileScreen } from '../screens/FriendProfileScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { MyGoalsScreen } from '../screens/MyGoalsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
@@ -15,6 +16,7 @@ export function ProfileNavigator() {
       <Stack.Screen component={MyGoalsScreen} name="MyGoals" />
       <Stack.Screen component={CreateGoalScreen} name="CreateGoal" />
       <Stack.Screen component={FriendsScreen} name="Friends" />
+      <Stack.Screen component={FriendProfileScreen} name="FriendProfile" />
     </Stack.Navigator>
   );
 }

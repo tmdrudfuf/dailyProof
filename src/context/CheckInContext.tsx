@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 
 import {
   createCheckIn,
@@ -147,6 +148,16 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       loadRequestId.current += 1;
     };
   }, [loadCheckIns]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && firebaseUser) {
+        void loadCheckIns();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [firebaseUser, loadCheckIns]);
 
   const refreshCheckIns = useCallback(async () => {
     await loadCheckIns();

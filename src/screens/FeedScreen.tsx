@@ -1,8 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -14,11 +18,11 @@ import { FeedCard } from '../components/FeedCard';
 import { useCheckIns } from '../context/CheckInContext';
 import { useFriends } from '../context/FriendContext';
 import { useGoals } from '../context/GoalContext';
-import {
-  getCommentsForPost,
-  getReactionsForPost,
-} from '../services/friendService';
 import { colors, radii } from '../theme';
+import { Friend } from '../types/friend';
+import { RootTabParamList } from '../types/navigation';
+
+type FeedScreenNavigation = BottomTabNavigationProp<RootTabParamList, 'Feed'>;
 
 function getCheckInTime(createdAt?: string) {
   if (!createdAt) {
@@ -37,6 +41,7 @@ function getCheckInTime(createdAt?: string) {
 }
 
 export function FeedScreen() {
+  const navigation = useNavigation<FeedScreenNavigation>();
   const {
     checkInFeedPosts,
     error: checkInError,
@@ -44,21 +49,38 @@ export function FeedScreen() {
     isLoading: isLoadingCheckIns,
     refreshCheckIns,
   } = useCheckIns();
-  const { friendFeedItems, reactions, toggleReaction } = useFriends();
-  const { activeGoals } = useGoals();
-  const restoredCheckInPosts = checkInFeedPosts.map((post) => ({
-    ...post,
-    timeAgo: getCheckInTime(post.createdAt),
-  }));
-  const friendCheckInPosts = friendFeedItems.map((post) => ({
-    ...post,
-    timeAgo: getCheckInTime(post.createdAt),
-  }));
-  const feedPosts = [...restoredCheckInPosts, ...friendCheckInPosts].sort(
-    (first, second) =>
-      new Date(second.createdAt ?? 0).getTime() -
-      new Date(first.createdAt ?? 0).getTime()
-  );
+  const {
+    error: friendError,
+    friends,
+    friendCommentsByPost,
+    friendFeedItems,
+    friendReactionsByPost,
+    isLoading: isLoadingFriends,
+    reactions,
+    refreshFriends,
+    addComment,
+    toggleReaction,
+    watchPostActivity,
+  } = useFriends();
+  const { activeGoals, refreshGoals } = useGoals();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const feedPosts = useMemo(() => {
+    const restoredCheckInPosts = checkInFeedPosts.map((post) => ({
+      ...post,
+      timeAgo: getCheckInTime(post.createdAt),
+    }));
+    const friendCheckInPosts = friendFeedItems.map((post) => ({
+      ...post,
+      timeAgo: getCheckInTime(post.createdAt),
+    }));
+
+    return [...restoredCheckInPosts, ...friendCheckInPosts].sort(
+      (first, second) =>
+        new Date(second.createdAt ?? 0).getTime() -
+        new Date(first.createdAt ?? 0).getTime()
+    );
+  }, [checkInFeedPosts, friendFeedItems]);
+  const feedPostIdKey = feedPosts.map((post) => post.id).join('|');
   const provedGoalCount = activeGoals.filter((goal) =>
     hasCheckedInToday(goal.id),
   ).length;
@@ -68,12 +90,51 @@ export function FeedScreen() {
   const completedAllGoals =
     totalGoalCount > 0 && provedGoalCount === totalGoalCount;
 
+  useEffect(() => {
+    const postIds = feedPostIdKey ? feedPostIdKey.split('|') : [];
+    return watchPostActivity(postIds);
+  }, [feedPostIdKey, watchPostActivity]);
+
+  const refreshFeed = useCallback(async () => {
+    setIsRefreshing(true);
+
+    try {
+      await Promise.all([
+        refreshCheckIns(),
+        refreshFriends(),
+        refreshGoals(),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshCheckIns, refreshFriends, refreshGoals]);
+
+  const openMentionProfile = useCallback(
+    (friend: Friend) => {
+      navigation.navigate('Profile', {
+        screen: 'FriendProfile',
+        params: { friendId: friend.id },
+      });
+    },
+    [navigation]
+  );
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <FlatList
         contentContainerStyle={styles.content}
         data={feedPosts}
         keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.ink]}
+            onRefresh={() => {
+              void refreshFeed();
+            }}
+            refreshing={isRefreshing}
+            tintColor={colors.ink}
+          />
+        }
         ListHeaderComponent={
           <>
             <View style={styles.topBar}>
@@ -147,17 +208,22 @@ export function FeedScreen() {
               </View>
             </View>
 
-            {isLoadingCheckIns ? (
+            {isLoadingCheckIns || isLoadingFriends ? (
               <View style={styles.statusBanner}>
                 <ActivityIndicator color={colors.ink} size="small" />
-                <Text style={styles.statusText}>Loading your check-ins...</Text>
+                <Text style={styles.statusText}>Loading your feed...</Text>
               </View>
-            ) : checkInError ? (
+            ) : checkInError || friendError ? (
               <View style={[styles.statusBanner, styles.errorBanner]}>
                 <Text style={[styles.statusText, styles.errorText]}>
-                  {checkInError}
+                  {checkInError || friendError}
                 </Text>
-                <Pressable onPress={() => void refreshCheckIns()}>
+                <Pressable
+                  onPress={() => {
+                    void refreshCheckIns();
+                    void refreshFriends();
+                  }}
+                >
                   <Text style={styles.retryText}>Retry</Text>
                 </Pressable>
               </View>
@@ -166,14 +232,13 @@ export function FeedScreen() {
         }
         renderItem={({ item }) => (
           <FeedCard
-            friendComments={getCommentsForPost(
-              item.id,
-              item.friendId
-            )}
-            friendReactions={getReactionsForPost(
-              item.id,
-              item.friendId
-            )}
+            friendComments={friendCommentsByPost[item.id] ?? []}
+            friendReactions={friendReactionsByPost[item.id] ?? []}
+            mentionableFriends={friends}
+            onSubmitComment={(message, parentCommentId) =>
+              addComment(item.id, message, parentCommentId)
+            }
+            onPressMention={openMentionProfile}
             onToggleReaction={(reaction) =>
               toggleReaction(item.id, reaction)
             }

@@ -1,24 +1,44 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { colors, radii } from '../theme';
 import { FeedPost } from '../types/feed';
 import {
   FriendComment,
+  Friend,
   FriendReaction,
   reactionEmojis,
   ReactionEmoji,
 } from '../types/friend';
 import { ActivityDetailModal } from './ActivityDetailModal';
 import { Avatar } from './Avatar';
+import { MentionText } from './MentionText';
+import {
+  getActiveMentionQuery,
+  insertMention,
+  MentionSuggestions,
+} from './MentionSuggestions';
 
 type FeedCardProps = {
   activityDisplayMode?: 'inline' | 'modal';
   post: FeedPost;
   friendComments?: FriendComment[];
+  mentionableFriends?: Friend[];
   friendReactions?: FriendReaction[];
   selectedReactions?: ReactionEmoji[];
+  onSubmitComment?: (
+    message: string,
+    parentCommentId?: string
+  ) => Promise<void> | void;
+  onPressMention?: (friend: Friend) => void;
   onToggleReaction?: (reaction: ReactionEmoji) => void;
 };
 
@@ -47,11 +67,15 @@ export function FeedCard({
   activityDisplayMode = 'modal',
   post,
   friendComments = [],
+  mentionableFriends = [],
   friendReactions = [],
   selectedReactions = [],
+  onSubmitComment,
+  onPressMention,
   onToggleReaction,
 }: FeedCardProps) {
   const visual = visualConfig[post.visual];
+  const [commentDraft, setCommentDraft] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
   const [showAllReactions, setShowAllReactions] = useState(false);
   const [activityModal, setActivityModal] = useState<
@@ -60,23 +84,23 @@ export function FeedCard({
   const visibleComments = showAllComments
     ? friendComments
     : friendComments.slice(0, 1);
-  const visibleReactions: FriendReaction[] = [
-    ...friendReactions,
-    ...selectedReactions
-      .filter(
-        (reaction) =>
-          !friendReactions.some(
-            (item) =>
-              item.friendId === 'local-user' &&
-              item.reaction === reaction
-          )
-      )
-      .map((reaction) => ({
-        friendId: 'local-user',
-        displayName: 'You',
-        reaction,
-      })),
-  ];
+  const topLevelComments = friendComments.filter(
+    (comment) => !comment.parentCommentId
+  );
+  const summaryComment = topLevelComments[0] ?? friendComments[0];
+  const visibleReactions: FriendReaction[] = friendReactions;
+  const mentionQuery = getActiveMentionQuery(commentDraft);
+
+  const submitComment = async () => {
+    const message = commentDraft.trim();
+
+    if (!message) {
+      return;
+    }
+
+    setCommentDraft('');
+    await onSubmitComment?.(message);
+  };
 
   return (
     <View style={styles.card}>
@@ -188,7 +212,7 @@ export function FeedCard({
                     ]}
                   >
                     <Text style={styles.reactorInitial}>
-                      {item.displayName.slice(0, 1)}
+                      {(item.username ?? item.displayName).slice(0, 1)}
                     </Text>
                   </View>
                 ))}
@@ -196,7 +220,10 @@ export function FeedCard({
               <Text style={styles.friendReactionText}>
                 {visibleReactions
                   .slice(0, 2)
-                  .map((item) => `${item.displayName} ${item.reaction}`)
+                  .map(
+                    (item) =>
+                      `${item.username ?? item.displayName} ${item.reaction}`
+                  )
                   .join(', ')}
                 {visibleReactions.length > 2
                   ? ` and ${visibleReactions.length - 2} more reacted`
@@ -255,7 +282,7 @@ export function FeedCard({
         {post.proof}
       </Text>
 
-      {friendComments.length > 0 ? (
+      {friendComments.length > 0 && summaryComment ? (
         <View style={styles.comments}>
           {!showAllComments ? (
             <Pressable
@@ -272,16 +299,19 @@ export function FeedCard({
             >
               <View style={styles.commentSummaryAvatar}>
                 <Text style={styles.commentInitial}>
-                  {friendComments[0].displayName.slice(0, 1)}
+                  {summaryComment.displayName.slice(0, 1)}
                 </Text>
               </View>
               <View style={styles.commentSummaryCopy}>
                 <Text style={styles.commentSummaryName}>
-                  {friendComments[0].displayName}
+                  {summaryComment.username ?? summaryComment.displayName}
                 </Text>
-                <Text numberOfLines={1} style={styles.commentSummaryMessage}>
-                  {friendComments[0].message}
-                </Text>
+                <MentionText
+                  friends={mentionableFriends}
+                  onPressMention={onPressMention}
+                  style={styles.commentSummaryMessage}
+                  text={summaryComment.message}
+                />
               </View>
               <Text style={styles.commentCount}>
                 {friendComments.length}
@@ -319,9 +349,13 @@ export function FeedCard({
                   <View style={styles.commentBubble}>
                     <Text style={styles.commentText}>
                       <Text style={styles.commentName}>
-                        {comment.displayName}{' '}
+                        {comment.username ?? comment.displayName}{' '}
                       </Text>
-                      {comment.message}
+                      <MentionText
+                        friends={mentionableFriends}
+                        onPressMention={onPressMention}
+                        text={comment.message}
+                      />
                     </Text>
                   </View>
                 </View>
@@ -330,11 +364,57 @@ export function FeedCard({
         </View>
       ) : null}
 
+      {onSubmitComment ? (
+        <View style={styles.commentComposerWrapper}>
+          {mentionQuery !== null ? (
+            <MentionSuggestions
+              friends={mentionableFriends}
+              query={mentionQuery}
+              onSelect={(friend) =>
+                setCommentDraft((current) =>
+                  insertMention(current, friend.username)
+                )
+              }
+            />
+          ) : null}
+          <View style={styles.commentComposer}>
+            <TextInput
+              onChangeText={setCommentDraft}
+              placeholder="Add a comment"
+              placeholderTextColor={colors.muted}
+              returnKeyType="send"
+              style={styles.commentInput}
+              value={commentDraft}
+              onSubmitEditing={() => {
+                void submitComment();
+              }}
+            />
+            <Pressable
+              accessibilityLabel="Submit comment"
+              accessibilityRole="button"
+              disabled={!commentDraft.trim()}
+              onPress={() => {
+                void submitComment();
+              }}
+              style={[
+                styles.commentSubmitButton,
+                !commentDraft.trim() && styles.commentSubmitButtonDisabled,
+              ]}
+            >
+              <Ionicons color={colors.ink} name="send" size={16} />
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       {activityDisplayMode === 'modal' ? (
         <ActivityDetailModal
           comments={friendComments}
+          mentionableFriends={mentionableFriends}
           mode={activityModal}
           onClose={() => setActivityModal(null)}
+          onPressMention={onPressMention}
+          onSubmitComment={onSubmitComment}
           reactions={visibleReactions}
         />
       ) : null}
@@ -673,5 +753,39 @@ const styles = StyleSheet.create({
   },
   commentName: {
     fontWeight: '900',
+  },
+  commentComposerWrapper: {
+    borderTopColor: colors.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 14,
+    paddingBottom: 14,
+    paddingTop: 12,
+  },
+  commentComposer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  commentInput: {
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.ink,
+    flex: 1,
+    fontSize: 12,
+    minHeight: 38,
+    paddingHorizontal: 13,
+  },
+  commentSubmitButton: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 19,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  commentSubmitButtonDisabled: {
+    opacity: 0.45,
   },
 });
