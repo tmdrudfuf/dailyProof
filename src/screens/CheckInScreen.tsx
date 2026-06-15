@@ -30,6 +30,7 @@ export function CheckInScreen({
   const {
     hasCheckedInToday,
     isUploading,
+    isVerifying,
     submitCheckIn,
   } = useCheckIns();
   const [permission, requestPermission] = useCameraPermissions();
@@ -83,8 +84,14 @@ export function CheckInScreen({
     setSubmitError('');
 
     try {
-      const checkIn = await submitCheckIn(goal, photoUri);
-      navigation.replace('CheckInResult', { checkInId: checkIn.id });
+      const result = await submitCheckIn(goal, photoUri);
+      navigation.replace('CheckInResult', {
+        aiConfidence: result.verification.aiConfidence,
+        aiFeedback: result.verification.aiFeedback,
+        aiResult: result.verification.aiResult,
+        checkInId: result.checkIn?.id,
+        goalId: goal.id,
+      });
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -256,7 +263,11 @@ export function CheckInScreen({
                 <View style={styles.uploadingContent}>
                   <ActivityIndicator color={colors.ink} size="small" />
                   <Text style={styles.uploadingText}>
-                    {isUploading ? 'Uploading photo...' : 'Preparing...'}
+                    {isUploading
+                      ? 'Uploading photo...'
+                      : isVerifying
+                        ? 'Verifying proof...'
+                        : 'Preparing...'}
                   </Text>
                 </View>
               ) : (

@@ -12,8 +12,13 @@ import { AppState } from 'react-native';
 
 import {
   createCheckIn,
+  createCheckInId,
   getCheckIns,
 } from '../services/checkInService';
+import {
+  deleteCheckInPhoto,
+  uploadCheckInPhoto,
+} from '../services/storageService';
 import { verifyCheckInPhoto } from '../services/verificationService';
 import { CheckIn } from '../types/checkIn';
 import { FeedPost } from '../types/feed';
@@ -21,14 +26,28 @@ import { Goal, GoalCategory } from '../types/goal';
 import { useAuth } from './AuthContext';
 import { useGoals } from './GoalContext';
 
+export type CheckInSubmissionResult = {
+  checkIn?: CheckIn;
+  uploadedPhotoUrl: string;
+  verification: {
+    aiConfidence: number;
+    aiResult: CheckIn['aiResult'];
+    aiFeedback: string;
+  };
+};
+
 type CheckInContextValue = {
   checkIns: CheckIn[];
   checkInFeedPosts: FeedPost[];
   isLoading: boolean;
   isUploading: boolean;
+  isVerifying: boolean;
   error: string;
   hasCheckedInToday: (goalId: string) => boolean;
-  submitCheckIn: (goal: Goal, photoUrl: string) => Promise<CheckIn>;
+  submitCheckIn: (
+    goal: Goal,
+    photoUrl: string
+  ) => Promise<CheckInSubmissionResult>;
   refreshCheckIns: () => Promise<void>;
 };
 
@@ -92,7 +111,9 @@ function getCheckInErrorMessage(error: unknown) {
       error.message.includes('no longer exists') ||
       error.message.includes('do not have access') ||
       error.message.includes('Photo upload') ||
-      error.message.includes('captured photo')
+      error.message.includes('captured photo') ||
+      error.message.includes('OpenAI') ||
+      error.message.includes('verification')
     ) {
       return error.message;
     }
@@ -107,6 +128,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const loadRequestId = useRef(0);
 
@@ -183,20 +205,42 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
 
       setError('');
 
+      const checkInId = createCheckInId();
+      let uploadedPhotoUrl = '';
+
       try {
+        setIsUploading(true);
+        uploadedPhotoUrl = await uploadCheckInPhoto(
+          firebaseUser.uid,
+          checkInId,
+          photoUrl
+        );
+        setIsUploading(false);
+
+        setIsVerifying(true);
         const verification = await verifyCheckInPhoto(
-          photoUrl,
+          uploadedPhotoUrl,
           goal.category,
           goal.title
         );
-        setIsUploading(true);
+        setIsVerifying(false);
+
+        if (verification.aiResult !== 'approved') {
+          await deleteCheckInPhoto(firebaseUser.uid, checkInId);
+          return {
+            uploadedPhotoUrl,
+            verification,
+          };
+        }
+
         const result = await createCheckIn({
+          id: checkInId,
           userId: firebaseUser.uid,
           goalId: goal.id,
           goalTitle: goal.title,
           category: goal.category,
           categoryEmoji: goal.categoryEmoji,
-          photoUrl,
+          photoUrl: uploadedPhotoUrl,
           ...verification,
         });
 
@@ -209,13 +253,22 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
           await refreshGoals();
         }
 
-        return result.checkIn;
+        return {
+          checkIn: result.checkIn,
+          uploadedPhotoUrl,
+          verification,
+        };
       } catch (submitError) {
+        if (uploadedPhotoUrl) {
+          await deleteCheckInPhoto(firebaseUser.uid, checkInId);
+        }
+
         const errorMessage = getCheckInErrorMessage(submitError);
         setError(errorMessage);
         throw new Error(errorMessage);
       } finally {
         setIsUploading(false);
+        setIsVerifying(false);
       }
     },
     [firebaseUser, refreshGoals]
@@ -253,6 +306,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       checkInFeedPosts,
       isLoading,
       isUploading,
+      isVerifying,
       error,
       hasCheckedInToday,
       submitCheckIn,
@@ -263,6 +317,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       checkInFeedPosts,
       isLoading,
       isUploading,
+      isVerifying,
       error,
       hasCheckedInToday,
       submitCheckIn,

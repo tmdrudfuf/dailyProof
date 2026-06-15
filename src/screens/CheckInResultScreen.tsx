@@ -23,8 +23,26 @@ export function CheckInResultScreen({
 }: CheckInResultScreenProps) {
   const { checkIns } = useCheckIns();
   const { goals } = useGoals();
-  const checkIn = checkIns.find((item) => item.id === route.params.checkInId);
-  const goal = goals.find((item) => item.id === checkIn?.goalId);
+  const checkIn = route.params.checkInId
+    ? checkIns.find((item) => item.id === route.params.checkInId)
+    : undefined;
+  const goal = goals.find(
+    (item) => item.id === (checkIn?.goalId ?? route.params.goalId)
+  );
+  const isApproved = route.params.aiResult === 'approved';
+  const isWarning = route.params.aiResult === 'warning';
+  const iconName = isApproved ? 'checkmark' : isWarning ? 'alert' : 'close';
+  const title = isApproved
+    ? 'Verified'
+    : isWarning
+      ? 'Needs Review'
+      : 'Rejected';
+  const subtitle = isApproved
+    ? 'Verified successfully.'
+    : isWarning
+      ? 'This proof is related, but not clear enough yet.'
+      : 'This photo does not match the selected goal.';
+  const confidence = checkIn?.aiConfidence ?? route.params.aiConfidence;
 
   function returnToFeed() {
     navigation.popToTop();
@@ -33,15 +51,25 @@ export function CheckInResultScreen({
       ?.navigate('Feed');
   }
 
+  function retakePhoto() {
+    navigation.replace('CheckIn', { goalId: route.params.goalId });
+  }
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <View style={styles.content}>
-        <View style={styles.verifiedIcon}>
-          <Ionicons color={colors.ink} name="checkmark" size={46} />
+        <View
+          style={[
+            styles.verifiedIcon,
+            isWarning && styles.warningIcon,
+            !isApproved && !isWarning && styles.rejectedIcon,
+          ]}
+        >
+          <Ionicons color={colors.ink} name={iconName} size={46} />
         </View>
-        <Text style={styles.eyebrow}>MOCK VERIFICATION</Text>
-        <Text style={styles.title}>Verified</Text>
-        <Text style={styles.subtitle}>Verified successfully.</Text>
+        <Text style={styles.eyebrow}>AI VERIFICATION</Text>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
 
         <View style={styles.resultCard}>
           <Text style={styles.cardLabel}>GOAL</Text>
@@ -55,38 +83,51 @@ export function CheckInResultScreen({
           </View>
           <View style={styles.divider} />
           <Text style={styles.cardLabel}>CONFIDENCE</Text>
-          <Text style={styles.confidence}>
-            {checkIn?.aiConfidence ?? 0}%
-          </Text>
+          <Text style={styles.confidence}>{confidence}%</Text>
           <View style={styles.confidenceTrack}>
             <View
               style={[
                 styles.confidenceFill,
-                { width: `${checkIn?.aiConfidence ?? 0}%` },
+                { width: `${confidence}%` },
+                isWarning && styles.warningFill,
+                !isApproved && !isWarning && styles.rejectedFill,
               ]}
             />
           </View>
         </View>
 
         <View style={styles.notice}>
-          <Ionicons color={colors.ink} name="information-circle-outline" size={18} />
+          <Ionicons
+            color={colors.ink}
+            name="information-circle-outline"
+            size={18}
+          />
           <Text style={styles.noticeText}>
-            {checkIn?.aiFeedback ??
-              'This confidence score is randomly generated for the local MVP.'}
+            {checkIn?.aiFeedback ?? route.params.aiFeedback}
           </Text>
         </View>
       </View>
 
       <Pressable
         accessibilityRole="button"
-        onPress={returnToFeed}
+        onPress={isApproved ? returnToFeed : retakePhoto}
         style={({ pressed }) => [
           styles.feedButton,
           pressed && styles.feedButtonPressed,
         ]}
       >
-        <Text style={styles.feedButtonText}>Return to Feed</Text>
-        <Ionicons color={colors.ink} name="arrow-forward" size={20} />
+        <Text style={styles.feedButtonText}>
+          {isApproved
+            ? 'Return to Feed'
+            : isWarning
+              ? 'Retake Proof'
+              : 'Retake Required'}
+        </Text>
+        <Ionicons
+          color={colors.ink}
+          name={isApproved ? 'arrow-forward' : 'camera'}
+          size={20}
+        />
       </Pressable>
     </SafeAreaView>
   );
@@ -112,6 +153,12 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-7deg' }],
     width: 86,
   },
+  warningIcon: {
+    backgroundColor: colors.softOrange,
+  },
+  rejectedIcon: {
+    backgroundColor: '#F5B8AE',
+  },
   eyebrow: {
     color: colors.accentDark,
     fontSize: 9,
@@ -130,6 +177,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 14,
     marginTop: 5,
+    textAlign: 'center',
   },
   resultCard: {
     backgroundColor: colors.surface,
@@ -184,6 +232,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderRadius: radii.pill,
     height: '100%',
+  },
+  warningFill: {
+    backgroundColor: colors.softOrange,
+  },
+  rejectedFill: {
+    backgroundColor: '#E5695C',
   },
   notice: {
     alignItems: 'center',

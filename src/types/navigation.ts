@@ -16,7 +16,13 @@ export type ProfileStackParamList = {
 export type CameraStackParamList = {
   CameraGoals: undefined;
   CheckIn: { goalId: string };
-  CheckInResult: { checkInId: string };
+  CheckInResult: {
+    aiConfidence: number;
+    aiFeedback: string;
+    aiResult: 'approved' | 'warning' | 'rejected';
+    checkInId?: string;
+    goalId: string;
+  };
 };
 
 export type RootTabParamList = {
