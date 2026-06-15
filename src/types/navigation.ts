@@ -11,6 +11,7 @@ export type ProfileStackParamList = {
   CreateGoal: undefined;
   Friends: undefined;
   FriendProfile: { friendId: string };
+  HistoryStats: undefined;
 };
 
 export type CameraStackParamList = {

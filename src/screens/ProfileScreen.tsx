@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '../components/Avatar';
 import { ProfileMenuItem } from '../components/ProfileMenuItem';
 import { useAuth } from '../context/AuthContext';
+import { useCheckIns } from '../context/CheckInContext';
 import { useFriends } from '../context/FriendContext';
 import { useGoals } from '../context/GoalContext';
 import { colors, radii } from '../theme';
@@ -29,6 +30,7 @@ const week = [
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { logout, profile } = useAuth();
   const { activeGoals } = useGoals();
+  const { checkIns } = useCheckIns();
   const { friends } = useFriends();
   const displayName = profile?.displayName ?? 'DailyProof User';
   const username = profile?.username ?? '@yourname';
@@ -46,7 +48,12 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       value: `${activeGoals.length} active`,
       onPress: () => navigation.navigate('MyGoals'),
     },
-    { label: 'History', icon: 'time-outline' as const, value: '48 proofs' },
+    {
+      label: 'History & Stats',
+      icon: 'time-outline' as const,
+      value: `${checkIns.length} proofs`,
+      onPress: () => navigation.navigate('HistoryStats'),
+    },
     {
       label: 'Friends',
       icon: 'people-outline' as const,
@@ -84,7 +91,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
 
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>48</Text>
+            <Text style={styles.statValue}>{checkIns.length}</Text>
             <Text style={styles.statLabel}>PROOFS</Text>
           </View>
           <View style={styles.divider} />
