@@ -376,7 +376,7 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
             <Text style={styles.selectedTimeText}>{reminderTime}</Text>
           </View>
           <Text style={styles.fieldHelp}>
-            This is saved with your goal. Notifications are not enabled yet.
+            A daily local notification will be scheduled for this time.
           </Text>
         </View>
       );

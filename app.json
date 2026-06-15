@@ -15,6 +15,13 @@
           "recordAudioAndroid": false
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#C9FF4A",
+          "defaultChannel": "dailyproof-reminders"
+        }
+      ],
       "expo-font"
     ],
     "ios": {

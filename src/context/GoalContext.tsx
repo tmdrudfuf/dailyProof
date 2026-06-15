@@ -14,8 +14,15 @@ import {
   deleteGoal as deleteStoredGoal,
   getGoals,
   MAX_ACTIVE_GOALS,
+  updateGoal as updateStoredGoal,
 } from '../services/goalService';
-import { Goal, NewGoal } from '../types/goal';
+import {
+  cancelGoalReminder,
+  rescheduleGoalReminder,
+  scheduleAllGoalReminders,
+  scheduleGoalReminder,
+} from '../services/notificationService';
+import { Goal, GoalUpdates, NewGoal } from '../types/goal';
 import { useAuth } from './AuthContext';
 
 type GoalContextValue = {
@@ -27,6 +34,7 @@ type GoalContextValue = {
   error: string;
   addGoal: (goal: NewGoal) => Promise<boolean>;
   deleteGoal: (goalId: string) => Promise<void>;
+  updateGoal: (goalId: string, updates: GoalUpdates) => Promise<void>;
   refreshGoals: () => Promise<void>;
 };
 
@@ -64,6 +72,11 @@ export function GoalProvider({ children }: GoalProviderProps) {
       if (loadRequestId.current === requestId) {
         setGoals(loadedGoals);
       }
+      scheduleAllGoalReminders(loadedGoals).catch((reminderError) => {
+        if (loadRequestId.current === requestId) {
+          setError(getGoalErrorMessage(reminderError));
+        }
+      });
     } catch (loadError) {
       if (loadRequestId.current === requestId) {
         setGoals([]);
@@ -114,6 +127,9 @@ export function GoalProvider({ children }: GoalProviderProps) {
           userId: firebaseUser.uid,
         });
         setGoals((currentGoals) => [goal, ...currentGoals]);
+        scheduleGoalReminder(goal).catch((reminderError) => {
+          setError(getGoalErrorMessage(reminderError));
+        });
         return true;
       } catch (createError) {
         setError(getGoalErrorMessage(createError));
@@ -130,6 +146,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
     setError('');
 
     try {
+      await cancelGoalReminder(goalId);
       await deleteStoredGoal(goalId);
       setGoals((currentGoals) =>
         currentGoals.filter((goal) => goal.id !== goalId)
@@ -138,6 +155,36 @@ export function GoalProvider({ children }: GoalProviderProps) {
       setError(getGoalErrorMessage(deleteError));
     }
   }, []);
+
+  const updateGoal = useCallback(async (goalId: string, updates: GoalUpdates) => {
+    setError('');
+
+    try {
+      await updateStoredGoal(goalId, updates);
+      const updatedGoal = goals.find((goal) => goal.id === goalId);
+
+      if (!updatedGoal) {
+        return;
+      }
+
+      const nextGoal = {
+        ...updatedGoal,
+        ...updates,
+      };
+
+      setGoals((currentGoals) =>
+        currentGoals.map((goal) => (goal.id === goalId ? nextGoal : goal))
+      );
+
+      if (!nextGoal.isActive) {
+        await cancelGoalReminder(goalId);
+      } else {
+        await rescheduleGoalReminder(nextGoal);
+      }
+    } catch (updateError) {
+      setError(getGoalErrorMessage(updateError));
+    }
+  }, [goals]);
 
   const value = useMemo(
     () => ({
@@ -149,6 +196,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
       error,
       addGoal,
       deleteGoal,
+      updateGoal,
       refreshGoals,
     }),
     [
@@ -160,6 +208,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
       error,
       addGoal,
       deleteGoal,
+      updateGoal,
       refreshGoals,
     ]
   );
@@ -179,6 +228,14 @@ function getGoalErrorMessage(error: unknown) {
 
     if (error.message.includes('unavailable')) {
       return 'Goals are temporarily unavailable. Check your connection.';
+    }
+
+    if (
+      error.message.includes('Notification permission') ||
+      error.message.includes('Goal reminders') ||
+      error.message.includes('Reminder time')
+    ) {
+      return error.message;
     }
   }
 
