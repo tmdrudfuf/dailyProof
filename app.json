@@ -5,6 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F2EA"
+    },
     "userInterfaceStyle": "light",
     "plugins": [
       [
@@ -19,15 +24,26 @@
         "expo-notifications",
         {
           "color": "#C9FF4A",
-          "defaultChannel": "dailyproof-reminders"
+          "defaultChannel": "dailyproof-reminders",
+          "sounds": []
         }
       ],
       "expo-font"
     ],
     "ios": {
+      "bundleIdentifier": "com.yourcompany.dailyproof",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow DailyProof to use your camera to capture proof photos.",
+        "NSUserNotificationUsageDescription": "Allow DailyProof to send goal reminder notifications."
+      },
       "supportsTablet": true
     },
     "android": {
+      "package": "com.yourcompany.dailyproof",
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
