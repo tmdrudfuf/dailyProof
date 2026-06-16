@@ -42,6 +42,10 @@ function isSameCalendarDay(firstDate: string, secondDate: string) {
 }
 
 export async function getCheckIns(userId: string): Promise<CheckIn[]> {
+  if (!userId) {
+    return [];
+  }
+
   const checkInsQuery = query(
     collection(db, CHECK_INS_COLLECTION),
     where('userId', '==', userId)
@@ -86,6 +90,18 @@ export async function hasCheckedInToday(
 export async function createCheckIn(
   newCheckIn: NewCheckIn & { id: string }
 ): Promise<CreateCheckInResult> {
+  if (!newCheckIn.userId) {
+    throw new Error('You must be logged in to check in.');
+  }
+
+  if (!newCheckIn.goalId) {
+    throw new Error('The selected goal no longer exists.');
+  }
+
+  if (!newCheckIn.photoUrl) {
+    throw new Error('The captured photo could not be read.');
+  }
+
   const checkInReference = doc(db, CHECK_INS_COLLECTION, newCheckIn.id);
   const goalReference = doc(db, GOALS_COLLECTION, newCheckIn.goalId);
   const createdAt = new Date().toISOString();

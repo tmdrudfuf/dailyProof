@@ -78,6 +78,8 @@ export function FeedCard({
   const [commentDraft, setCommentDraft] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
   const [showAllReactions, setShowAllReactions] = useState(false);
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [activityModal, setActivityModal] = useState<
     'comments' | 'reactions' | null
   >(null);
@@ -94,13 +96,22 @@ export function FeedCard({
   const submitComment = async () => {
     const message = commentDraft.trim();
 
-    if (!message) {
+    if (!message || isSubmittingComment) {
       return;
     }
 
-    setCommentDraft('');
-    await onSubmitComment?.(message);
+    try {
+      setIsSubmittingComment(true);
+      setCommentDraft('');
+      await onSubmitComment?.(message);
+    } catch (error) {
+      console.error('[FeedCard] Comment submit failed.', error);
+      setCommentDraft(message);
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
+  const hasValidPhoto = Boolean(post.photoUrl && post.photoUrl !== failedPhotoUrl);
 
   return (
     <View style={styles.card}>
@@ -120,9 +131,15 @@ export function FeedCard({
 
       {post.isCheckIn ? (
         <View style={styles.mockPhoto}>
-          {post.photoUrl ? (
+          {hasValidPhoto ? (
             <Image
               accessibilityLabel={`${post.goal} check-in photo`}
+              onError={() => {
+                console.warn('[FeedCard] Failed to load feed photo.', {
+                  postId: post.id,
+                });
+                setFailedPhotoUrl(post.photoUrl ?? '');
+              }}
               resizeMode="cover"
               source={{ uri: post.photoUrl }}
               style={styles.checkInPhotoImage}
@@ -392,16 +409,24 @@ export function FeedCard({
             <Pressable
               accessibilityLabel="Submit comment"
               accessibilityRole="button"
-              disabled={!commentDraft.trim()}
+              accessibilityState={{
+                disabled: !commentDraft.trim() || isSubmittingComment,
+              }}
+              disabled={!commentDraft.trim() || isSubmittingComment}
               onPress={() => {
                 void submitComment();
               }}
               style={[
                 styles.commentSubmitButton,
-                !commentDraft.trim() && styles.commentSubmitButtonDisabled,
+                (!commentDraft.trim() || isSubmittingComment) &&
+                  styles.commentSubmitButtonDisabled,
               ]}
             >
-              <Ionicons color={colors.ink} name="send" size={16} />
+              <Ionicons
+                color={colors.ink}
+                name={isSubmittingComment ? 'hourglass-outline' : 'send'}
+                size={16}
+              />
             </Pressable>
           </View>
         </View>

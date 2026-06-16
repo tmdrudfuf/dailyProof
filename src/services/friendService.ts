@@ -14,8 +14,6 @@ import { CheckIn } from '../types/checkIn';
 import { FeedPost } from '../types/feed';
 import {
   Friend,
-  FriendComment,
-  FriendReaction,
   FriendRequest,
   Friendship,
 } from '../types/friend';
@@ -131,6 +129,18 @@ export async function sendFriendRequest(
 
   const friendshipId = getFriendshipId(requesterId, receiverId);
   const reference = doc(db, FRIENDSHIPS_COLLECTION, friendshipId);
+  const existingSnapshot = await getDoc(reference);
+
+  if (existingSnapshot.exists()) {
+    const existingFriendship = existingSnapshot.data() as Friendship;
+
+    if (existingFriendship.status === 'accepted') {
+      throw new Error('You are already friends.');
+    }
+
+    throw new Error('A friend request already exists.');
+  }
+
   const now = new Date().toISOString();
   const friendship: Friendship = {
     id: friendshipId,
@@ -304,6 +314,7 @@ async function getVisibleGoals(userId: string): Promise<Goal[]> {
       ...(snapshot.data() as Omit<Goal, 'id'>),
       id: snapshot.id,
     }))
+    .filter((goal) => goal.visibility === 'Friends' || goal.visibility === 'Public');
 }
 
 async function getGoalCheckIns(goalId: string): Promise<CheckIn[]> {
@@ -321,6 +332,10 @@ async function getGoalCheckIns(goalId: string): Promise<CheckIn[]> {
 }
 
 export async function getFeedItems(userId: string): Promise<FeedPost[]> {
+  if (!userId) {
+    return [];
+  }
+
   const friends = await getFriends(userId);
   const postGroups = await Promise.all(
     friends.map(async (friend) => {
@@ -332,8 +347,15 @@ export async function getFeedItems(userId: string): Promise<FeedPost[]> {
         }))
       );
 
-      return goalCheckIns.flatMap(({ checkIns }) =>
-        checkIns.map((checkIn) => ({
+      return goalCheckIns.flatMap(({ goal, checkIns }) =>
+        checkIns
+          .filter(
+            (checkIn) =>
+              checkIn.goalId === goal.id &&
+              checkIn.userId === friend.id &&
+              Boolean(checkIn.photoUrl)
+          )
+          .map((checkIn) => ({
           id: checkIn.id,
           friendId: friend.id,
           friendName: friend.displayName,
@@ -361,13 +383,3 @@ export async function getFeedItems(userId: string): Promise<FeedPost[]> {
         new Date(first.createdAt ?? 0).getTime()
     );
 }
-
-export const getReactionsForPost = (
-  _postId: string,
-  _ownerId?: string
-): FriendReaction[] => [];
-
-export const getCommentsForPost = (
-  _postId: string,
-  _ownerId?: string
-): FriendComment[] => [];

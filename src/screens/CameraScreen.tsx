@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -20,7 +22,7 @@ type CameraScreenProps = NativeStackScreenProps<
 >;
 
 export function CameraScreen({ navigation }: CameraScreenProps) {
-  const { activeGoals } = useGoals();
+  const { activeGoals, error, isLoading, refreshGoals } = useGoals();
   const { hasCheckedInToday } = useCheckIns();
 
   return (
@@ -28,16 +30,43 @@ export function CameraScreen({ navigation }: CameraScreenProps) {
       <FlatList
         contentContainerStyle={styles.content}
         data={activeGoals}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.ink]}
+            onRefresh={() => {
+              void refreshGoals();
+            }}
+            refreshing={isLoading}
+            tintColor={colors.ink}
+          />
+        }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyExtractor={(goal) => goal.id}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons color={colors.muted} name="flag-outline" size={32} />
-            <Text style={styles.emptyTitle}>No active goals</Text>
-            <Text style={styles.emptyText}>
-              Create an active goal in Profile before checking in.
-            </Text>
-          </View>
+          isLoading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={colors.ink} />
+              <Text style={styles.emptyTitle}>Loading goals</Text>
+              <Text style={styles.emptyText}>Finding your active promises...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyState}>
+              <Ionicons color="#8E342D" name="alert-circle-outline" size={32} />
+              <Text style={styles.emptyTitle}>Could not load goals</Text>
+              <Text style={styles.emptyText}>{error}</Text>
+              <Pressable onPress={() => void refreshGoals()} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons color={colors.muted} name="flag-outline" size={32} />
+              <Text style={styles.emptyTitle}>No active goals</Text>
+              <Text style={styles.emptyText}>
+                Create an active goal in Profile before checking in.
+              </Text>
+            </View>
+          )
         }
         ListHeaderComponent={
           <View style={styles.header}>
@@ -240,5 +269,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 6,
     textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    marginTop: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

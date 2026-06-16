@@ -73,12 +73,14 @@ export function GoalProvider({ children }: GoalProviderProps) {
         setGoals(loadedGoals);
       }
       scheduleAllGoalReminders(loadedGoals).catch((reminderError) => {
+        console.warn('[GoalContext] Goal reminder scheduling failed.', reminderError);
         if (loadRequestId.current === requestId) {
           setError(getGoalErrorMessage(reminderError));
         }
       });
     } catch (loadError) {
       if (loadRequestId.current === requestId) {
+        console.error('[GoalContext] Failed to load goals.', loadError);
         setGoals([]);
         setError(getGoalErrorMessage(loadError));
       }
@@ -128,10 +130,12 @@ export function GoalProvider({ children }: GoalProviderProps) {
         });
         setGoals((currentGoals) => [goal, ...currentGoals]);
         scheduleGoalReminder(goal).catch((reminderError) => {
+          console.warn('[GoalContext] Goal reminder scheduling failed.', reminderError);
           setError(getGoalErrorMessage(reminderError));
         });
         return true;
       } catch (createError) {
+        console.error('[GoalContext] Goal creation failed.', createError);
         setError(getGoalErrorMessage(createError));
         return false;
       } finally {
@@ -152,6 +156,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
         currentGoals.filter((goal) => goal.id !== goalId)
       );
     } catch (deleteError) {
+      console.error('[GoalContext] Goal deletion failed.', deleteError);
       setError(getGoalErrorMessage(deleteError));
     }
   }, []);
@@ -182,6 +187,7 @@ export function GoalProvider({ children }: GoalProviderProps) {
         await rescheduleGoalReminder(nextGoal);
       }
     } catch (updateError) {
+      console.error('[GoalContext] Goal update failed.', updateError);
       setError(getGoalErrorMessage(updateError));
     }
   }, [goals]);

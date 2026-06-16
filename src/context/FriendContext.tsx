@@ -128,6 +128,7 @@ export function FriendProvider({ children }: PropsWithChildren) {
   const [actionUserId, setActionUserId] = useState('');
   const [error, setError] = useState('');
   const loadRequestId = useRef(0);
+  const searchRequestId = useRef(0);
 
   const loadFriendState = useCallback(async () => {
     const requestId = loadRequestId.current + 1;
@@ -171,6 +172,7 @@ export function FriendProvider({ children }: PropsWithChildren) {
       }
     } catch (loadError) {
       if (loadRequestId.current === requestId) {
+        console.error('[FriendContext] Failed to load friend state.', loadError);
         setError(getFriendErrorMessage(loadError));
       }
     } finally {
@@ -194,8 +196,12 @@ export function FriendProvider({ children }: PropsWithChildren) {
 
   const searchUsers = useCallback(
     async (query: string) => {
+      const requestId = searchRequestId.current + 1;
+      searchRequestId.current = requestId;
+
       if (!firebaseUser || !query.trim()) {
         setSearchResults([]);
+        setIsSearching(false);
         return;
       }
 
@@ -203,12 +209,20 @@ export function FriendProvider({ children }: PropsWithChildren) {
       setError('');
 
       try {
-        setSearchResults(await searchStoredUsers(query, firebaseUser.uid));
+        const results = await searchStoredUsers(query, firebaseUser.uid);
+        if (searchRequestId.current === requestId) {
+          setSearchResults(results);
+        }
       } catch (searchError) {
-        setSearchResults([]);
-        setError(getFriendErrorMessage(searchError));
+        if (searchRequestId.current === requestId) {
+          console.error('[FriendContext] Friend search failed.', searchError);
+          setSearchResults([]);
+          setError(getFriendErrorMessage(searchError));
+        }
       } finally {
-        setIsSearching(false);
+        if (searchRequestId.current === requestId) {
+          setIsSearching(false);
+        }
       }
     },
     [firebaseUser]
@@ -224,6 +238,7 @@ export function FriendProvider({ children }: PropsWithChildren) {
         await loadFriendState();
         return true;
       } catch (actionError) {
+        console.error('[FriendContext] Friend action failed.', actionError);
         setError(getFriendErrorMessage(actionError));
         return false;
       } finally {
@@ -255,6 +270,7 @@ export function FriendProvider({ children }: PropsWithChildren) {
           setReactions(selectedReactions);
         },
         (reactionError) => {
+          console.error('[FriendContext] Reaction subscription failed.', reactionError);
           setError(getFriendErrorMessage(reactionError));
         }
       );
@@ -262,6 +278,7 @@ export function FriendProvider({ children }: PropsWithChildren) {
         uniquePostIds,
         setFriendCommentsByPost,
         (commentError) => {
+          console.error('[FriendContext] Comment subscription failed.', commentError);
           setError(getFriendErrorMessage(commentError));
         }
       );
@@ -291,9 +308,22 @@ export function FriendProvider({ children }: PropsWithChildren) {
           : [...selectedPostReactions, reaction],
       }));
 
-      void (isSelected
-        ? removeReaction(postId, reaction, firebaseUser.uid)
-        : addReaction(postId, reaction, currentProfile));
+      void (async () => {
+        try {
+          if (isSelected) {
+            await removeReaction(postId, reaction, firebaseUser.uid);
+          } else {
+            await addReaction(postId, reaction, currentProfile);
+          }
+        } catch (reactionError) {
+          console.error('[FriendContext] Reaction update failed.', reactionError);
+          setReactions((current) => ({
+            ...current,
+            [postId]: selectedPostReactions,
+          }));
+          setError(getFriendErrorMessage(reactionError));
+        }
+      })();
     },
     [firebaseUser, profile, reactions]
   );
@@ -312,7 +342,9 @@ export function FriendProvider({ children }: PropsWithChildren) {
           parentCommentId
         );
       } catch (commentError) {
+        console.error('[FriendContext] Comment creation failed.', commentError);
         setError(getFriendErrorMessage(commentError));
+        throw commentError;
       }
     },
     [firebaseUser, profile]

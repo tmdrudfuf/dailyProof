@@ -17,6 +17,14 @@ export async function uploadCheckInPhoto(
   localUri: string
 ): Promise<string> {
   try {
+    if (!userId || !checkInId) {
+      throw new Error('You must be logged in to upload a proof photo.');
+    }
+
+    if (!localUri) {
+      throw new Error('The captured photo could not be read.');
+    }
+
     const response = await fetch(localUri);
 
     if (!response.ok) {
@@ -38,7 +46,7 @@ export async function uploadCheckInPhoto(
     if (error instanceof Error) {
       if (error.message.includes('storage/unauthorized')) {
         throw new Error(
-          'Photo upload was denied. Check your Firebase Storage rules.'
+          'Photo upload was denied. Please try again after signing in.'
         );
       }
 
@@ -68,7 +76,8 @@ export async function deleteCheckInPhoto(
     await deleteObject(
       ref(storage, getCheckInPhotoPath(userId, checkInId))
     );
-  } catch {
+  } catch (error) {
+    console.warn('[storageService] Failed to clean up check-in photo.', error);
     // A failed cleanup must not hide the original check-in error.
   }
 }

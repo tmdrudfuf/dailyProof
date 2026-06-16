@@ -145,6 +145,9 @@ export function HistoryScreen({ navigation }: HistoryScreenProps) {
     'all'
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const filteredCheckIns = useMemo(() => {
     const checkInsForGoal =
@@ -392,10 +395,27 @@ export function HistoryScreen({ navigation }: HistoryScreenProps) {
               <Text style={styles.dateTitle}>{group.date}</Text>
               {group.checkIns.map((checkIn) => (
                 <View key={checkIn.id} style={styles.historyCard}>
-                  <Image
-                    source={{ uri: checkIn.photoUrl }}
-                    style={styles.historyImage}
-                  />
+                  {checkIn.photoUrl && !failedPhotoIds[checkIn.id] ? (
+                    <Image
+                      onError={() => {
+                        console.warn('[HistoryScreen] Failed to load history photo.', {
+                          checkInId: checkIn.id,
+                        });
+                        setFailedPhotoIds((current) => ({
+                          ...current,
+                          [checkIn.id]: true,
+                        }));
+                      }}
+                      source={{ uri: checkIn.photoUrl }}
+                      style={styles.historyImage}
+                    />
+                  ) : (
+                    <View style={[styles.historyImage, styles.historyImageFallback]}>
+                      <Text style={styles.historyImageFallbackEmoji}>
+                        {checkIn.categoryEmoji || '✨'}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.historyCopy}>
                     <Text style={styles.historyTitle}>
                       {checkIn.categoryEmoji} {checkIn.goalTitle}
@@ -586,6 +606,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.line,
     height: 128,
     width: 108,
+  },
+  historyImageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyImageFallbackEmoji: {
+    fontSize: 32,
   },
   historyCopy: {
     flex: 1,

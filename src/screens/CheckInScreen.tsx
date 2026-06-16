@@ -62,6 +62,7 @@ export function CheckInScreen({
 
     try {
       setIsCapturing(true);
+      setSubmitError('');
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         skipProcessing: false,
@@ -69,7 +70,12 @@ export function CheckInScreen({
 
       if (photo?.uri) {
         setPhotoUri(photo.uri);
+      } else {
+        setSubmitError('The camera did not return a photo. Please try again.');
       }
+    } catch (captureError) {
+      console.error('[CheckInScreen] Photo capture failed.', captureError);
+      setSubmitError('Photo capture failed. Please try again.');
     } finally {
       setIsCapturing(false);
     }
@@ -283,7 +289,14 @@ export function CheckInScreen({
           ) : null}
         </View>
       ) : (
-        renderCamera()
+        <>
+          {renderCamera()}
+          {submitError ? (
+            <View style={styles.cameraErrorBanner}>
+              <Text style={styles.cameraErrorText}>{submitError}</Text>
+            </View>
+          ) : null}
+        </>
       )}
     </SafeAreaView>
   );
@@ -299,6 +312,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 12,
+    textAlign: 'center',
+  },
+  cameraErrorBanner: {
+    backgroundColor: '#FBE9E6',
+    bottom: 104,
+    left: 18,
+    padding: 12,
+    position: 'absolute',
+    right: 18,
+    borderRadius: radii.medium,
+  },
+  cameraErrorText: {
+    color: '#8E342D',
+    fontSize: 12,
+    fontWeight: '800',
     textAlign: 'center',
   },
   uploadingContent: {

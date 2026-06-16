@@ -114,6 +114,10 @@ export async function verifyCheckInPhoto(
   goalCategory: GoalCategory,
   goalTitle: string
 ): Promise<VerificationResult> {
+  if (!photoUrl) {
+    throw new Error('The proof photo is missing. Please retake the photo.');
+  }
+
   if (!OPENAI_API_KEY) {
     throw new Error(
       'OpenAI verification is not configured. Add EXPO_PUBLIC_OPENAI_API_KEY to your environment.'
@@ -202,6 +206,7 @@ export async function verifyCheckInPhoto(
       }
     }
 
+    console.error('[verificationService] OpenAI verification failed.', error);
     throw new Error(
       'OpenAI verification could not be completed. Please retry or retake the photo.'
     );

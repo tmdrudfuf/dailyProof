@@ -11,11 +11,19 @@ import { db } from './firebase';
 const USERS_COLLECTION = 'users';
 
 export async function createUserProfile(profile: User): Promise<User> {
+  if (!profile.uid) {
+    throw new Error('A user profile cannot be created without a user id.');
+  }
+
   await setDoc(doc(db, USERS_COLLECTION, profile.uid), profile);
   return profile;
 }
 
 export async function getUserProfile(uid: string): Promise<User | null> {
+  if (!uid) {
+    return null;
+  }
+
   const snapshot = await getDoc(doc(db, USERS_COLLECTION, uid));
 
   if (!snapshot.exists()) {
@@ -39,6 +47,10 @@ export async function updateUserProfile(
   uid: string,
   updates: Partial<Omit<User, 'uid' | 'createdAt'>>
 ): Promise<User | null> {
+  if (!uid) {
+    return null;
+  }
+
   const reference = doc(db, USERS_COLLECTION, uid);
   await updateDoc(reference, updates);
   return getUserProfile(uid);

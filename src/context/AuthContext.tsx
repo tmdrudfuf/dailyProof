@@ -53,7 +53,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
           if (isMounted) {
             setProfile(userProfile);
           }
-        } catch {
+        } catch (profileError) {
+          console.warn('[AuthContext] Failed to load user profile.', profileError);
           if (isMounted) {
             setProfile(null);
           }

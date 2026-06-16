@@ -164,6 +164,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
       }
     } catch (loadError) {
       if (loadRequestId.current === requestId) {
+        console.error('[CheckInContext] Failed to load check-ins.', loadError);
         setCheckIns([]);
         setError(getCheckInErrorMessage(loadError));
       }
@@ -211,7 +212,18 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
   const submitCheckIn = useCallback(
     async (goal: Goal, photoUrl: string) => {
       if (!firebaseUser) {
+        console.warn('[CheckInContext] Blocked check-in without a current user.');
         throw new Error('You must be logged in to check in.');
+      }
+
+      if (!goal?.id) {
+        console.warn('[CheckInContext] Blocked check-in with a missing goal.');
+        throw new Error('The selected goal no longer exists.');
+      }
+
+      if (!photoUrl) {
+        console.warn('[CheckInContext] Blocked check-in with a missing photo URI.');
+        throw new Error('The captured photo could not be read.');
       }
 
       setError('');
@@ -270,6 +282,7 @@ export function CheckInProvider({ children }: CheckInProviderProps) {
           verification,
         };
       } catch (submitError) {
+        console.error('[CheckInContext] Check-in submission failed.', submitError);
         if (uploadedPhotoUrl) {
           await deleteCheckInPhoto(firebaseUser.uid, checkInId);
         }
