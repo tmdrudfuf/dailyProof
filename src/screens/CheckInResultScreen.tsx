@@ -38,7 +38,7 @@ export function CheckInResultScreen({
       ? 'Needs Review'
       : 'Rejected';
   const subtitle = isApproved
-    ? 'Verified successfully.'
+    ? 'Verified successfully and saved to your feed.'
     : isWarning
       ? 'This proof is related, but not clear enough yet.'
       : 'This photo does not match the selected goal.';

@@ -223,7 +223,7 @@ function getGoalErrorMessage(error: unknown) {
     }
 
     if (error.message.includes('permission-denied')) {
-      return 'Goal access was denied. Check your Firestore rules.';
+      return 'We could not access your goals right now. Please try again.';
     }
 
     if (error.message.includes('unavailable')) {

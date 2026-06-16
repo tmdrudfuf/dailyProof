@@ -100,7 +100,7 @@ function getInitials(displayName: string) {
 function getCheckInErrorMessage(error: unknown) {
   if (error instanceof Error) {
     if (error.message.includes('permission-denied')) {
-      return 'Check-in access was denied. Check your Firestore rules.';
+      return 'Your check-in could not be saved right now. Please try again.';
     }
 
     if (error.message.includes('unavailable')) {
@@ -110,12 +110,23 @@ function getCheckInErrorMessage(error: unknown) {
     if (
       error.message.includes('no longer exists') ||
       error.message.includes('do not have access') ||
+      error.message.includes('captured photo')
+    ) {
+      return error.message;
+    }
+
+    if (
       error.message.includes('Photo upload') ||
-      error.message.includes('captured photo') ||
+      error.message.includes('Storage')
+    ) {
+      return 'Photo upload failed. Check your connection and try again.';
+    }
+
+    if (
       error.message.includes('OpenAI') ||
       error.message.includes('verification')
     ) {
-      return error.message;
+      return 'AI verification could not be completed. Retry or retake the photo.';
     }
   }
 

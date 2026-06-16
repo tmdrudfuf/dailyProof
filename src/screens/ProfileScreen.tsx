@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
@@ -17,15 +17,33 @@ type ProfileScreenProps = NativeStackScreenProps<
   'ProfileHome'
 >;
 
-const week = [
-  { day: 'M', done: true },
-  { day: 'T', done: true },
-  { day: 'W', done: true },
-  { day: 'T', done: false },
-  { day: 'F', done: false },
-  { day: 'S', done: false },
-  { day: 'S', done: false },
-];
+function getCurrentWeekDays() {
+  const today = new Date();
+  const monday = new Date(today);
+  const day = today.getDay() || 7;
+  monday.setDate(today.getDate() - day + 1);
+
+  return ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+
+    return {
+      label,
+      key: getDateKey(date),
+    };
+  });
+}
+
+function getDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalDateKey(value: string) {
+  return getDateKey(new Date(value));
+}
 
 export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { logout, profile } = useAuth();
@@ -35,6 +53,14 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const displayName = profile?.displayName ?? 'DailyProof User';
   const username = profile?.username ?? '@yourname';
   const currentStreak = profile?.currentStreak ?? 0;
+  const completedDateKeys = new Set(
+    checkIns.map((checkIn) => getLocalDateKey(checkIn.createdAt))
+  );
+  const week = getCurrentWeekDays().map((item) => ({
+    ...item,
+    done: completedDateKeys.has(item.key),
+  }));
+  const weekProofs = week.filter((item) => item.done).length;
   const initials = displayName
     .split(' ')
     .map((part) => part[0])
@@ -65,7 +91,16 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       label: 'Log Out',
       icon: 'log-out-outline' as const,
       onPress: () => {
-        void logout();
+        Alert.alert('Log out?', 'You can sign back in anytime.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Log Out',
+            style: 'destructive',
+            onPress: () => {
+              void logout();
+            },
+          },
+        ]);
       },
     },
   ];
@@ -110,21 +145,25 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
           <View style={styles.weekHeader}>
             <View>
               <Text style={styles.cardEyebrow}>THIS WEEK</Text>
-              <Text style={styles.weekTitle}>3 promises kept</Text>
+              <Text style={styles.weekTitle}>
+                {weekProofs} {weekProofs === 1 ? 'promise' : 'promises'} kept
+              </Text>
             </View>
             <View style={styles.percentBadge}>
-              <Text style={styles.percentText}>43%</Text>
+              <Text style={styles.percentText}>
+                {Math.round((weekProofs / 7) * 100)}%
+              </Text>
             </View>
           </View>
           <View style={styles.days}>
-            {week.map((item, index) => (
-              <View key={`${item.day}-${index}`} style={styles.day}>
+            {week.map((item) => (
+              <View key={item.key} style={styles.day}>
                 <View style={[styles.dayDot, item.done && styles.dayDotDone]}>
                   {item.done ? (
                     <Ionicons color={colors.ink} name="checkmark" size={16} />
                   ) : null}
                 </View>
-                <Text style={styles.dayLabel}>{item.day}</Text>
+                <Text style={styles.dayLabel}>{item.label}</Text>
               </View>
             ))}
           </View>

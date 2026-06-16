@@ -55,10 +55,10 @@ type FriendContextValue = {
   actionUserId: string;
   error: string;
   searchUsers: (query: string) => Promise<void>;
-  sendFriendRequest: (receiverId: string) => Promise<void>;
-  acceptFriendRequest: (friendshipId: string) => Promise<void>;
-  declineFriendRequest: (friendshipId: string) => Promise<void>;
-  removeFriend: (friendshipId: string) => Promise<void>;
+  sendFriendRequest: (receiverId: string) => Promise<boolean>;
+  acceptFriendRequest: (friendshipId: string) => Promise<boolean>;
+  declineFriendRequest: (friendshipId: string) => Promise<boolean>;
+  removeFriend: (friendshipId: string) => Promise<boolean>;
   refreshFriends: () => Promise<void>;
   watchPostActivity: (postIds: string[]) => () => void;
   toggleReaction: (postId: string, reaction: ReactionEmoji) => void;
@@ -82,7 +82,7 @@ function getFriendErrorMessage(error: unknown) {
     }
 
     if (error.message.includes('permission-denied')) {
-      return 'Friend activity could not be saved. Check your Firestore rules.';
+      return 'Friend activity could not be saved right now. Please try again.';
     }
 
     if (error.message.includes('unavailable')) {
@@ -222,8 +222,10 @@ export function FriendProvider({ children }: PropsWithChildren) {
       try {
         await action();
         await loadFriendState();
+        return true;
       } catch (actionError) {
         setError(getFriendErrorMessage(actionError));
+        return false;
       } finally {
         setActionUserId('');
       }
@@ -333,25 +335,25 @@ export function FriendProvider({ children }: PropsWithChildren) {
       searchUsers,
       sendFriendRequest: async (receiverId) => {
         if (!firebaseUser) {
-          return;
+          return false;
         }
 
-        await runFriendAction(receiverId, async () => {
+        return runFriendAction(receiverId, async () => {
           await sendStoredFriendRequest(firebaseUser.uid, receiverId);
         });
       },
       acceptFriendRequest: async (friendshipId) => {
-        await runFriendAction(friendshipId, async () => {
+        return runFriendAction(friendshipId, async () => {
           await acceptStoredFriendRequest(friendshipId);
         });
       },
       declineFriendRequest: async (friendshipId) => {
-        await runFriendAction(friendshipId, async () => {
+        return runFriendAction(friendshipId, async () => {
           await declineStoredFriendRequest(friendshipId);
         });
       },
       removeFriend: async (friendshipId) => {
-        await runFriendAction(friendshipId, async () => {
+        return runFriendAction(friendshipId, async () => {
           await removeStoredFriend(friendshipId);
         });
       },

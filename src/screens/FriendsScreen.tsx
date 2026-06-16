@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -101,10 +100,32 @@ export function FriendsScreen({ navigation }: FriendsScreenProps) {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => void removeFriend(friend.friendshipId),
+          onPress: () => {
+            void removeFriend(friend.friendshipId).then((removed) => {
+              if (removed) {
+                Alert.alert('Friend removed', `${friend.displayName} was removed.`);
+              }
+            });
+          },
         },
       ]
     );
+  }
+
+  async function handleSendFriendRequest(user: Friend) {
+    const sent = await sendFriendRequest(user.id);
+
+    if (sent) {
+      Alert.alert('Friend request sent', `Request sent to ${user.displayName}.`);
+    }
+  }
+
+  async function handleAcceptFriendRequest(friendshipId: string, user: Friend) {
+    const accepted = await acceptFriendRequest(friendshipId);
+
+    if (accepted) {
+      Alert.alert('Friend added', `${user.displayName} is now your friend.`);
+    }
   }
 
   return (
@@ -171,7 +192,7 @@ export function FriendsScreen({ navigation }: FriendsScreenProps) {
                         disabled={
                           isFriend || isOutgoing || isIncoming || isWorking
                         }
-                        onPress={() => void sendFriendRequest(user.id)}
+                        onPress={() => void handleSendFriendRequest(user)}
                         style={[
                           styles.primaryButton,
                           (isFriend || isOutgoing || isIncoming) &&
@@ -228,7 +249,7 @@ export function FriendsScreen({ navigation }: FriendsScreenProps) {
                       <Pressable
                         disabled={isWorking}
                         onPress={() =>
-                          void acceptFriendRequest(friendship.id)
+                          void handleAcceptFriendRequest(friendship.id, user)
                         }
                         style={styles.acceptAction}
                       >

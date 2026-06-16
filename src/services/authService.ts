@@ -25,7 +25,7 @@ let pendingSignupProfile: PendingSignupProfile | null = null;
 function assertFirebaseConfigured() {
   if (!isFirebaseConfigured) {
     throw new Error(
-      'Firebase is not configured. Add the EXPO_PUBLIC_FIREBASE_* values to .env.local.'
+      'Sign-in is not configured yet. Add the app configuration values to .env.local.'
     );
   }
 }
@@ -135,7 +135,7 @@ export function subscribeToAuthState(
 export function getReadableAuthError(error: unknown) {
   if (
     error instanceof Error &&
-    error.message.startsWith('Firebase is not configured.')
+    error.message.startsWith('Sign-in is not configured yet.')
   ) {
     return error.message;
   }
@@ -148,18 +148,18 @@ export function getReadableAuthError(error: unknown) {
     'auth/email-already-in-use':
       'An account already exists with this email.',
     'auth/api-key-not-valid.-please-pass-a-valid-api-key.':
-      'Firebase is not configured yet. Check your .env.local values.',
+      'Sign-in is not configured yet. Check your .env.local values.',
     'auth/invalid-api-key':
-      'Firebase is not configured yet. Check your .env.local values.',
+      'Sign-in is not configured yet. Check your .env.local values.',
     'auth/configuration-not-found':
-      'Enable Email/Password sign-in in the Firebase Console.',
+      'Email and password sign-in is not enabled yet.',
     'auth/invalid-credential': 'The email or password is incorrect.',
     'auth/invalid-email': 'Enter a valid email address.',
     'auth/missing-password': 'Enter your password.',
     'auth/network-request-failed':
       'Unable to connect. Check your internet connection.',
     'auth/operation-not-allowed':
-      'Email and password sign-in is not enabled in Firebase.',
+      'Email and password sign-in is not enabled yet.',
     'auth/too-many-requests':
       'Too many attempts. Please wait and try again.',
     'auth/user-disabled': 'This account has been disabled.',
@@ -167,7 +167,7 @@ export function getReadableAuthError(error: unknown) {
     'auth/weak-password': 'Use a password with at least 6 characters.',
     'auth/wrong-password': 'The email or password is incorrect.',
     'firestore/permission-denied':
-      'Firestore denied access to this profile. Check your security rules.',
+      'We could not access your profile right now. Please try again.',
     'firestore/unavailable':
       'The profile service is temporarily unavailable. Try again.',
   };

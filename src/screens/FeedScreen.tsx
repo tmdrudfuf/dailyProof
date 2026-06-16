@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
+import { useAuth } from '../context/AuthContext';
 import { FeedCard } from '../components/FeedCard';
 import { useCheckIns } from '../context/CheckInContext';
 import { useFriends } from '../context/FriendContext';
@@ -40,8 +41,34 @@ function getCheckInTime(createdAt?: string) {
   });
 }
 
+function getTodayLabel() {
+  return new Date().toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    weekday: 'short',
+  }).toUpperCase();
+}
+
+function getInitials(value?: string | null) {
+  const cleanValue = value?.replace('@', '').trim();
+
+  if (!cleanValue) {
+    return 'DP';
+  }
+
+  const initials = cleanValue
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || 'DP';
+}
+
 export function FeedScreen() {
   const navigation = useNavigation<FeedScreenNavigation>();
+  const { firebaseUser, profile } = useAuth();
   const {
     checkInFeedPosts,
     error: checkInError,
@@ -89,6 +116,12 @@ export function FeedScreen() {
     totalGoalCount === 0 ? 0 : (provedGoalCount / totalGoalCount) * 100;
   const completedAllGoals =
     totalGoalCount > 0 && provedGoalCount === totalGoalCount;
+  const profileInitials = getInitials(
+    profile?.displayName ??
+      firebaseUser?.displayName ??
+      profile?.username ??
+      firebaseUser?.email
+  );
 
   useEffect(() => {
     const postIds = feedPostIdKey ? feedPostIdKey.split('|') : [];
@@ -139,7 +172,7 @@ export function FeedScreen() {
           <>
             <View style={styles.topBar}>
               <View>
-                <Text style={styles.eyebrow}>WED, JUNE 10</Text>
+                <Text style={styles.eyebrow}>{getTodayLabel()}</Text>
                 <Text style={styles.brand}>DailyProof.</Text>
               </View>
               <View style={styles.topActions}>
@@ -147,7 +180,7 @@ export function FeedScreen() {
                   <Ionicons color={colors.ink} name="notifications-outline" size={21} />
                   <View style={styles.notificationDot} />
                 </Pressable>
-                <Avatar initials="DP" size={42} />
+                <Avatar initials={profileInitials} size={42} />
               </View>
             </View>
 
@@ -246,6 +279,26 @@ export function FeedScreen() {
             selectedReactions={reactions[item.id]}
           />
         )}
+        ListEmptyComponent={
+          !isLoadingCheckIns && !isLoadingFriends && !checkInError && !friendError ? (
+            <View style={styles.emptyFeed}>
+              <View style={styles.emptyIcon}>
+                <Ionicons color={colors.ink} name="camera-outline" size={28} />
+              </View>
+              <Text style={styles.emptyTitle}>No proofs yet today.</Text>
+              <Text style={styles.emptyText}>
+                Check in on a goal or add friends to start filling your feed.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('Camera')}
+                style={styles.emptyButton}
+              >
+                <Text style={styles.emptyButtonText}>Prove a goal</Text>
+              </Pressable>
+            </View>
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
       />
@@ -438,6 +491,48 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#8E342D',
     fontSize: 12,
+    fontWeight: '900',
+  },
+  emptyFeed: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.large,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 34,
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 28,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 16,
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 7,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    marginTop: 17,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+  },
+  emptyButtonText: {
+    color: colors.ink,
+    fontSize: 13,
     fontWeight: '900',
   },
 });

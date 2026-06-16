@@ -3,6 +3,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -174,6 +175,10 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
   }
 
   async function handleContinue() {
+    if (isSaving) {
+      return;
+    }
+
     const validationError = validateCurrentStep();
     if (validationError) {
       setError(validationError);
@@ -202,6 +207,7 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
     };
 
     if (await addGoal(goal)) {
+      Alert.alert('Goal created', 'Your new goal is ready to prove.');
       navigation.goBack();
     } else {
       setError('You can have up to 3 active goals.');
@@ -482,7 +488,10 @@ export function CreateGoalScreen({ navigation }: CreateGoalScreenProps) {
             ]}
           >
             {isSaving ? (
-              <ActivityIndicator color={colors.muted} />
+              <View style={styles.loadingButtonContent}>
+                <ActivityIndicator color={colors.muted} />
+                <Text style={styles.loadingButtonText}>Creating goal...</Text>
+              </View>
             ) : (
               <>
                 <Text
@@ -842,6 +851,16 @@ const styles = StyleSheet.create({
   continueButtonPressed: {
     opacity: 0.72,
     transform: [{ scale: 0.99 }],
+  },
+  loadingButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  loadingButtonText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '900',
   },
   continueText: {
     color: colors.ink,
