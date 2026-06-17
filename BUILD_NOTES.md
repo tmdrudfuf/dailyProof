@@ -4,6 +4,14 @@ These notes prepare DailyProof v1 for Expo/EAS preview builds. Do not submit to 
 
 ## 1. Install EAS CLI
 
+Use EAS CLI through `npx`. The npm package name is `eas-cli`:
+
+```bash
+npx eas-cli@latest --version
+```
+
+Or install it globally:
+
 ```bash
 npm install -g eas-cli
 ```
@@ -17,13 +25,13 @@ eas --version
 ## 2. Log In To Expo
 
 ```bash
-eas login
+npx eas-cli@latest login
 ```
 
 Confirm the active account:
 
 ```bash
-eas whoami
+npx eas-cli@latest whoami
 ```
 
 ## 3. Configure EAS
@@ -31,10 +39,10 @@ eas whoami
 From the project root:
 
 ```bash
-eas build:configure
+npx eas-cli@latest build:configure
 ```
 
-This creates `eas.json` if it does not already exist.
+This project already includes `eas.json`.
 
 Suggested preview profile:
 
@@ -57,7 +65,7 @@ Suggested preview profile:
 Use this for a demo APK:
 
 ```bash
-eas build --platform android --profile preview
+npx eas-cli@latest build --platform android --profile preview
 ```
 
 When the build finishes, download and install the APK on an Android device.
@@ -67,7 +75,7 @@ When the build finishes, download and install the APK on an Android device.
 iOS builds require an Apple Developer account and device provisioning.
 
 ```bash
-eas build --platform ios --profile preview
+npx eas-cli@latest build --platform ios --profile preview
 ```
 
 For TestFlight or App Store release, create separate production settings and review signing, app privacy, and store metadata first.
@@ -99,6 +107,26 @@ Use `.env.local` for local development and configure matching secrets/environmen
 
 Required variables are listed in `.env.example`.
 
+For EAS cloud builds, configure environment variables in Expo/EAS:
+
+```bash
+npx eas-cli@latest env:create
+```
+
+Or manage them from the Expo dashboard for the project.
+
+For the Android preview build, you can sync the local `.env.local` values with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-eas-preview-env.ps1
+```
+
+Then rebuild the APK:
+
+```powershell
+C:\nvm4w\nodejs\npx.cmd eas-cli@latest build --platform android --profile preview --clear-cache
+```
+
 Important: `EXPO_PUBLIC_OPENAI_API_KEY` is client-visible. It is acceptable for local demos only. Before production, move OpenAI verification to Firebase Functions or another backend.
 
 ## Verification Before Building
@@ -110,4 +138,3 @@ npx tsc --noEmit
 npx expo-doctor
 npx expo start
 ```
-

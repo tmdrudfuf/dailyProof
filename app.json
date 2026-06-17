@@ -42,7 +42,8 @@
       "package": "com.yourcompany.dailyproof",
       "permissions": [
         "CAMERA",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.CAMERA"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -54,6 +55,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e4b2578f-8297-4e50-921d-3664691b972f"
+      }
     }
   }
 }
